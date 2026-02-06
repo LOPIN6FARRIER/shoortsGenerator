@@ -184,8 +184,8 @@ export async function generateVideo(
     const videoDuration = duration / imagePaths.length;
     const audioIndex = imagePaths.length;
 
-    // Crear inputs de videos
-    const videoInputs = imagePaths.map((p) => `-i "${p}"`).join(" ");
+    // Crear inputs de videos con loop para asegurar duración suficiente
+    const videoInputs = imagePaths.map((p) => `-stream_loop -1 -i "${p}"`).join(" ");
 
     // Procesar cada video: escalar, recortar y ajustar duración
     const videoFilters = imagePaths
