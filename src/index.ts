@@ -99,8 +99,8 @@ async function runPipeline(): Promise<void> {
 //   '0 0 * * 0'     - Cada domingo a medianoche
 //   '0 8,20 * * *'  - Diario a las 8:00 AM y 8:00 PM
 
-const CRON_CHECK_INTERVAL = "*/10 * * * *"; // Cada 10 minutos
-const CRON_RETRY_INTERVAL = "0 */2 * * *"; // Cada 2 horas
+const CRON_CHECK_INTERVAL = process.env.CRON_CHECK_INTERVAL || "*/30 * * * *"; // Cada 30 minutos
+const CRON_RETRY_INTERVAL = process.env.CRON_RETRY_INTERVAL || "0 */2 * * *"; // Cada 2 horas
 const API_PORT = process.env.API_PORT || 3000;
 
 async function startServer() {
