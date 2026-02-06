@@ -43,9 +43,20 @@ export async function downloadTopicImages(
       Logger.info(`✅ Encontradas ${existingImages.length} imágenes en BD`);
 
       // Verificar que los archivos existan en disco
-      const validImages = existingImages.filter((img) =>
-        existsSync(img.file_path),
-      );
+      // IMPORTANTE: Convertir rutas relativas de BD a absolutas actuales
+      const validImages = existingImages.filter((img) => {
+        // Si la ruta en BD es absoluta, extraer solo la parte relativa
+        const filename = img.file_path.split(/[\\/]/).pop() || "";
+        const absolutePath = join(outputDir, filename);
+        const exists = existsSync(absolutePath);
+        
+        if (exists) {
+          // Actualizar con la ruta absoluta actual
+          img.file_path = absolutePath;
+        }
+        
+        return exists;
+      });
 
       if (validImages.length === existingImages.length) {
         Logger.info(
@@ -116,7 +127,8 @@ async function saveImageReferences(
   try {
     const imageRefs: DBTopicImage[] = sources.map((src, index) => ({
       topic_id: topicId,
-      file_path: filePaths[index],
+      // 🔧 GUARDAR SOLO NOMBRE DE ARCHIVO (portable entre entornos)
+      file_path: filePaths[index].split(/[\\\/]/).pop() || filePaths[index],
       source_url: src.url,
       source_platform: src.source === "fallback" ? undefined : src.source,
       unsplash_photo_id: src.source === "unsplash" ? src.photoId : undefined,
