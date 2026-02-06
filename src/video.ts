@@ -172,7 +172,7 @@ async function generateBackground(
   const command =
     `ffmpeg -f lavfi -i "color=c=0x1a1a2e:s=${width}x${height}:d=1" ` +
     `-vf "geq=r='128-128*Y/H':g='128-64*Y/H':b='192-128*Y/H'" ` +
-    `"${outputPath}" -y`;
+    `-update 1 -frames:v 1 "${outputPath}" -y`;
 
   await execAsync(command);
   Logger.info("Fondo generado");

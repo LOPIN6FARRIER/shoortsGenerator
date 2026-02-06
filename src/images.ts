@@ -4,16 +4,20 @@ import { pipeline } from "stream/promises";
 import { Logger } from "./utils.js";
 import { CONFIG } from "./config.js";
 import { Topic } from "./topic.js";
+import { getTopicImages, saveTopicImages, DBTopicImage } from "./database.js";
 
 export interface ImageSource {
   url: string;
   downloadUrl: string;
   photographer: string;
+  photographerUrl?: string;
+  photoId?: string;
   source: "unsplash" | "pexels" | "fallback";
 }
 
 /**
  * Descarga imágenes de Unsplash relacionadas con el topic
+ * Primero busca en BD si ya existen imágenes guardadas, si no las descarga
  */
 export async function downloadTopicImages(
   topic: Topic,
@@ -21,13 +25,58 @@ export async function downloadTopicImages(
   count: number = 4,
 ): Promise<string[]> {
   try {
-    Logger.info(`Buscando ${count} imágenes para: ${topic.title}`);
+    // Validar que topic existe y tiene las propiedades necesarias
+    if (!topic || !topic.title) {
+      Logger.warn(
+        "Topic inválido o sin título, no se pueden descargar imágenes",
+      );
+      return [];
+    }
+
+    // 1. BUSCAR PRIMERO EN BD
+    Logger.info(
+      `🔍 Verificando si ya existen imágenes en BD para topic: ${topic.id}`,
+    );
+    const existingImages = await getTopicImages(topic.id);
+
+    if (existingImages.length > 0) {
+      Logger.info(`✅ Encontradas ${existingImages.length} imágenes en BD`);
+
+      // Verificar que los archivos existan en disco
+      const validImages = existingImages.filter((img) =>
+        existsSync(img.file_path),
+      );
+
+      if (validImages.length === existingImages.length) {
+        Logger.info(
+          `♻️  Reutilizando ${validImages.length} imágenes existentes`,
+        );
+        return validImages.map((img) => img.file_path);
+      } else {
+        Logger.warn(
+          `⚠️  Solo ${validImages.length}/${existingImages.length} imágenes existen en disco`,
+        );
+        if (validImages.length >= count) {
+          return validImages.slice(0, count).map((img) => img.file_path);
+        }
+      }
+    }
+
+    // 2. SI NO EXISTEN O SON INSUFICIENTES, DESCARGAR NUEVAS
+    Logger.info(`📥 Descargando ${count} imágenes nuevas para: ${topic.title}`);
 
     // Intentar con Unsplash primero
     if (CONFIG.unsplash.accessKey) {
       const images = await searchUnsplashImages(topic, count);
       if (images.length > 0) {
-        return await downloadImages(images, outputDir);
+        const downloadedPaths = await downloadImages(images, outputDir);
+
+        // Guardar referencias en BD
+        if (downloadedPaths.length > 0) {
+          await saveImageReferences(topic.id, images, downloadedPaths);
+        }
+
+        return downloadedPaths;
       }
     }
 
@@ -36,7 +85,14 @@ export async function downloadTopicImages(
       Logger.warn("Unsplash no disponible, intentando con Pexels...");
       const images = await searchPexelsImages(topic, count);
       if (images.length > 0) {
-        return await downloadImages(images, outputDir);
+        const downloadedPaths = await downloadImages(images, outputDir);
+
+        // Guardar referencias en BD
+        if (downloadedPaths.length > 0) {
+          await saveImageReferences(topic.id, images, downloadedPaths);
+        }
+
+        return downloadedPaths;
       }
     }
 
@@ -46,6 +102,33 @@ export async function downloadTopicImages(
   } catch (error: any) {
     Logger.error("Error descargando imágenes:", error.message);
     return [];
+  }
+}
+
+/**
+ * Guarda las referencias de imágenes descargadas en BD
+ */
+async function saveImageReferences(
+  topicId: string,
+  sources: ImageSource[],
+  filePaths: string[],
+): Promise<void> {
+  try {
+    const imageRefs: DBTopicImage[] = sources.map((src, index) => ({
+      topic_id: topicId,
+      file_path: filePaths[index],
+      source_url: src.url,
+      source_platform: src.source === "fallback" ? undefined : src.source,
+      unsplash_photo_id: src.source === "unsplash" ? src.photoId : undefined,
+      pexels_photo_id: src.source === "pexels" ? src.photoId : undefined,
+      photographer_name: src.photographer,
+      photographer_url: src.photographerUrl,
+      download_order: index,
+    }));
+
+    await saveTopicImages(imageRefs);
+  } catch (error: any) {
+    Logger.error("Error guardando referencias de imágenes:", error.message);
   }
 }
 
@@ -83,6 +166,8 @@ async function searchUnsplashImages(
       url: photo.urls.regular,
       downloadUrl: photo.urls.raw + "&w=1080&h=1920&fit=crop",
       photographer: photo.user.name,
+      photographerUrl: photo.user.links.html,
+      photoId: photo.id,
       source: "unsplash" as const,
     }));
 
@@ -126,6 +211,8 @@ async function searchPexelsImages(
       url: photo.src.large,
       downloadUrl: photo.src.portrait,
       photographer: photo.photographer,
+      photographerUrl: photo.photographer_url,
+      photoId: photo.id.toString(),
       source: "pexels" as const,
     }));
 

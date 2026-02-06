@@ -74,6 +74,19 @@ export interface DBErrorLog {
   context?: any;
 }
 
+export interface DBTopicImage {
+  id?: string;
+  topic_id: string;
+  file_path: string;
+  source_url?: string;
+  source_platform?: "unsplash" | "pexels";
+  unsplash_photo_id?: string;
+  pexels_photo_id?: string;
+  photographer_name?: string;
+  photographer_url?: string;
+  download_order: number;
+}
+
 // ============================================
 // CONEXIÓN A BASE DE DATOS
 // ============================================
@@ -392,6 +405,48 @@ export async function getCostSummary(days: number = 30): Promise<any[]> {
 export async function getChannelPerformance(): Promise<any[]> {
   const db = getDatabase();
   const result = await db.query("SELECT * FROM channel_performance");
+  return result.rows;
+}
+
+// ============================================
+// TOPIC IMAGES
+// ============================================
+
+export async function saveTopicImages(images: DBTopicImage[]): Promise<void> {
+  if (images.length === 0) return;
+
+  const db = getDatabase();
+
+  for (const img of images) {
+    await db.query(
+      `INSERT INTO topic_images (topic_id, file_path, source_url, source_platform, unsplash_photo_id, pexels_photo_id, photographer_name, photographer_url, download_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (topic_id, download_order) DO UPDATE SET
+         file_path = EXCLUDED.file_path,
+         source_url = EXCLUDED.source_url`,
+      [
+        img.topic_id,
+        img.file_path,
+        img.source_url || null,
+        img.source_platform || null,
+        img.unsplash_photo_id || null,
+        img.pexels_photo_id || null,
+        img.photographer_name || null,
+        img.photographer_url || null,
+        img.download_order,
+      ],
+    );
+  }
+
+  Logger.info(`✅ Guardadas ${images.length} referencias de imágenes en BD`);
+}
+
+export async function getTopicImages(topicId: string): Promise<DBTopicImage[]> {
+  const db = getDatabase();
+  const result = await db.query<DBTopicImage>(
+    `SELECT * FROM topic_images WHERE topic_id = $1 ORDER BY download_order`,
+    [topicId],
+  );
   return result.rows;
 }
 

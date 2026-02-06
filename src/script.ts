@@ -116,8 +116,13 @@ export async function generateBilingualScripts(
   Logger.info("Generando scripts bilingües con IA...");
 
   if (process.env.DEBBUGING === "true") {
+    Logger.info(
+      "Modo DEBBUGING activo: reutilizando el último guion generado.",
+    );
     const latestScript = await getLattestScript();
     if (latestScript) {
+      // Asegurarnos de que el script tiene el topic correcto
+      latestScript.topic = topic;
       return { es: latestScript as Script, en: latestScript as Script };
     }
   }

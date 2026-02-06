@@ -9,3 +9,7 @@ assets/images/
 *.mp4
 *.srt
 credentials-*.json
+
+# Database schemas (contain credentials)
+database/schema.sql
+database/add_*.sql
