@@ -7,7 +7,7 @@ export { executePipeline } from "./pipeline.js";
 export { generateTopic } from "./topic.js";
 export { generateScript, generateBilingualScripts } from "./script.js";
 export { generateTTS, checkEdgeTTS } from "./tts.js";
-export { generateSRT, generateShortsOptimizedSRT } from "./subtitles.js";
+export { generateShortsOptimizedSRT } from "./subtitles.js";
 export { generateVideo, checkFFmpeg } from "./video.js";
 export { uploadToYouTube, checkCredentials } from "./upload.js";
 export { CONFIG } from "./config.js";

@@ -95,27 +95,42 @@ async function processChannel(
     processing_time_seconds: videoDuration,
   });
 
-  // Upload a YouTube
-  Logger.info(`Subiendo a YouTube (${language.toUpperCase()})...`);
-  const uploadStart = Date.now();
-  const uploadResult = await uploadToYouTube(
-    videoResult.videoPath,
-    script,
-    channelConfig,
-  );
-  const uploadDuration = Math.round((Date.now() - uploadStart) / 1000);
-  Logger.success(`Subido: ${uploadResult.url} (${uploadDuration}s)`);
+  // 🔍 MODO DEBUGGING: Saltar upload a YouTube para revisión local
+  let uploadResult: any;
+  let uploadDuration = 0;
 
-  // Guardar upload en BD
-  await saveYouTubeUpload({
-    video_id: videoDbId,
-    youtube_video_id: uploadResult.videoId,
-    youtube_url: uploadResult.url,
-    channel: language,
-    title: uploadResult.title,
-    privacy_status: "public",
-    upload_duration_seconds: uploadDuration,
-  });
+  if (process.env.DEBBUGING === "true") {
+    Logger.warn(
+      `⚠️  MODO DEBUGGING: Saltando upload a YouTube. Video disponible en: ${videoResult.videoPath}`,
+    );
+    uploadResult = {
+      videoId: "debug-video-" + Date.now(),
+      url: `file://${videoResult.videoPath}`,
+      title: script.title,
+    };
+  } else {
+    // Upload normal a YouTube
+    Logger.info(`Subiendo a YouTube (${language.toUpperCase()})...`);
+    const uploadStart = Date.now();
+    uploadResult = await uploadToYouTube(
+      videoResult.videoPath,
+      script,
+      channelConfig,
+    );
+    uploadDuration = Math.round((Date.now() - uploadStart) / 1000);
+    Logger.success(`Subido: ${uploadResult.url} (${uploadDuration}s)`);
+
+    // Guardar upload en BD
+    await saveYouTubeUpload({
+      video_id: videoDbId,
+      youtube_video_id: uploadResult.videoId,
+      youtube_url: uploadResult.url,
+      channel: language,
+      title: uploadResult.title,
+      privacy_status: "public",
+      upload_duration_seconds: uploadDuration,
+    });
+  }
 
   const totalTime = Math.round((Date.now() - startTime) / 1000);
 
@@ -215,22 +230,31 @@ export async function executePipeline(): Promise<void> {
     // Guardar scripts en BD
     let esScriptId = "";
     let enScriptId = "";
-    if (dbHealthy && process.env.DEBBUGING !== "true") {
-      const esTokens = scripts.es.tokensUsed || 0;
-      const enTokens = scripts.en.tokensUsed || 0;
+    if (dbHealthy) {
+      if (process.env.DEBBUGING === "true") {
+        // En modo DEBUGGING, obtener el ID del script reutilizado
+        esScriptId = (scripts.es as any).id || "";
+        enScriptId = (scripts.en as any).id || "";
+        Logger.info(
+          `IDs de scripts reutilizados: ES=${esScriptId}, EN=${enScriptId}`,
+        );
+      } else {
+        const esTokens = scripts.es.tokensUsed || 0;
+        const enTokens = scripts.en.tokensUsed || 0;
 
-      esScriptId = await saveScript({
-        ...scripts.es,
-        openai_model: CONFIG.openai.model,
-        openai_tokens_used: esTokens,
-      });
-      enScriptId = await saveScript({
-        ...scripts.en,
-        openai_model: CONFIG.openai.model,
-        openai_tokens_used: enTokens,
-      });
-      totalTokens += esTokens + enTokens;
-      Logger.info(`Tokens scripts: ES=${esTokens}, EN=${enTokens}`);
+        esScriptId = await saveScript({
+          ...scripts.es,
+          openai_model: CONFIG.openai.model,
+          openai_tokens_used: esTokens,
+        });
+        enScriptId = await saveScript({
+          ...scripts.en,
+          openai_model: CONFIG.openai.model,
+          openai_tokens_used: enTokens,
+        });
+        totalTokens += esTokens + enTokens;
+        Logger.info(`Tokens scripts: ES=${esTokens}, EN=${enTokens}`);
+      }
     }
 
     // PASO 3: Canal Español

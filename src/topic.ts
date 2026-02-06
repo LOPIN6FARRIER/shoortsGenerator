@@ -25,20 +25,16 @@ function titleToKebabCase(title: string): string {
 }
 
 export async function generateTopic(): Promise<Topic> {
+  // 🔍 MODO DEBUGGING: Intentar reutilizar último topic de BD
   if (process.env.DEBBUGING === "true") {
-    Logger.warn("DEBUGGING mode activo: Usando topic fijo de prueba.");
+    Logger.info("🔍 DEBUGGING mode: Buscando último topic en BD...");
     let topic = await getLatestTopic();
     if (topic) {
+      Logger.warn("♻️  Reutilizando topic existente de BD: " + topic.title);
       return topic;
     }
-    return {
-      id: "the-history-of-the-paperclip",
-      title: "The History of the Paperclip",
-      description:
-        "Discover the fascinating history and evolution of the humble paperclip, from its invention to its role in modern offices.",
-      timestamp: new Date().toISOString(),
-      tokensUsed: 0,
-    };
+    Logger.info("📝 No hay topics en BD, generando uno nuevo...");
+    // Si no hay topic en BD, continuar con generación normal
   }
 
   if (!CONFIG.openai.apiKey) {

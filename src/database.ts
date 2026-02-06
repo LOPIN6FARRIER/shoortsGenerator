@@ -249,6 +249,17 @@ export async function getLattestScript(): Promise<DBScript | null> {
   return result.rows[0] || null;
 }
 
+export async function getLatestScriptByLanguage(
+  language: "es" | "en",
+): Promise<DBScript | null> {
+  const db = getDatabase();
+  const result = await db.query<DBScript>(
+    "SELECT * FROM scripts WHERE language = $1 ORDER BY created_at DESC LIMIT 1",
+    [language],
+  );
+  return result.rows[0] || null;
+}
+
 export async function saveScript(script: DBScript): Promise<string> {
   const db = getDatabase();
   const wordCount = script.narrative.split(/\s+/).length;
