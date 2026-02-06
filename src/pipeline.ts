@@ -85,7 +85,7 @@ async function processChannel(
     script_id: scriptDbId,
     language,
     file_path: videoResult.videoPath,
-    duration_seconds: videoResult.duration,
+    duration_seconds: Math.round(videoResult.duration), // Redondear a entero para BD
     width: videoResult.width,
     height: videoResult.height,
     file_size_mb: parseFloat(fileSizeMb.toFixed(2)),

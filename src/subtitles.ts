@@ -39,9 +39,11 @@ export function generateShortsOptimizedSRT(
   // Calcular palabras por segmento basado en wordsPerSecond
   const totalWords = words.length;
   const wordsPerSegment = Math.ceil(
-    channelConfig.subtitles.wordsPerSecond * 1.5,
-  ); // 1.5s por segmento
+    channelConfig.subtitles.wordsPerSecond * 2.0,
+  ); // 2.0s por segmento para mejor sincronización
   const totalSegments = Math.ceil(totalWords / wordsPerSegment);
+  
+  // Ajustar timing para que coincida con la duración real del audio
   const timePerSegment = duration / totalSegments;
 
   let segmentIndex = 1;
