@@ -26,12 +26,34 @@ export interface TTSResult {
 export async function generateTTS(
   script: Script,
   outputDir: string,
+  voiceConfig?: { voice: string; voiceRate: string; voicePitch: string },
 ): Promise<TTSResult> {
   Logger.info(`Generando TTS para: ${script.title}`);
 
   const language = script.language as "es" | "en";
-  const channelConfig = getChannelConfig(language);
-  const voice = channelConfig.audio.voice;
+
+  // Si se provee configuración de canal, usarla; si no, usar channels.config.ts
+  let voice: string;
+  let rateParam: string;
+  let pitchParam: string;
+
+  if (voiceConfig) {
+    voice = voiceConfig.voice;
+    rateParam = voiceConfig.voiceRate;
+    pitchParam = voiceConfig.voicePitch;
+    Logger.info(
+      `📢 Usando voz del canal: ${voice} (rate: ${rateParam}, pitch: ${pitchParam})`,
+    );
+  } else {
+    const channelConfig = getChannelConfig(language);
+    voice = channelConfig.audio.voice;
+    const speedPercent = Math.round((channelConfig.audio.voiceSpeed - 1) * 100);
+    rateParam = speedPercent > 0 ? `+${speedPercent}%` : `${speedPercent}%`;
+    pitchParam = channelConfig.audio.voicePitch;
+    Logger.info(
+      `📢 Usando voz de config: ${voice} (rate: ${rateParam}, pitch: ${pitchParam})`,
+    );
+  }
 
   const audioPath = join(outputDir, "audio.mp3");
   const tempAudioPath = join(outputDir, "audio_temp.mp3");
@@ -41,13 +63,6 @@ export async function generateTTS(
   writeFileSync(textPath, script.narrative, "utf-8");
 
   try {
-    // ⚡ GENERAR AUDIO CON EDGE-TTS
-    // Edge-TTS soporta --rate para velocidad (formato: +X% o -X%)
-    const speedPercent = Math.round((channelConfig.audio.voiceSpeed - 1) * 100);
-    const rateParam =
-      speedPercent > 0 ? `+${speedPercent}%` : `${speedPercent}%`;
-    const pitchParam = channelConfig.audio.voicePitch;
-
     const command = `edge-tts --voice "${voice}" --rate="${rateParam}" --pitch="${pitchParam}" --file "${textPath}" --write-media "${tempAudioPath}"`;
     Logger.info(`Ejecutando: ${command}`);
 
@@ -81,7 +96,7 @@ export async function generateTTS(
     }
 
     Logger.success(
-      `✅ Audio generado: ${audioPath} (${duration}s) @ ${channelConfig.audio.voiceSpeed}x speed`,
+      `✅ Audio generado: ${audioPath} (${duration}s con ${voice})`,
     );
 
     return {

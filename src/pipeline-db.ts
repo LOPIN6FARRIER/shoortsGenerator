@@ -290,8 +290,12 @@ async function processChannelGroup(
     );
     ensureDir(outputDir);
 
-    // TTS
-    const ttsResult = await generateTTS(script, outputDir);
+    // TTS con configuración del canal
+    const ttsResult = await generateTTS(script, outputDir, {
+      voice: channel.voice,
+      voiceRate: channel.voice_rate,
+      voicePitch: channel.voice_pitch,
+    });
 
     // Subtítulos
     const srtPath = await generateShortsOptimizedSRT(

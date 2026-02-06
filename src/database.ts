@@ -607,7 +607,7 @@ export async function getPendingUploadVideos(): Promise<
        c.name as channel_name
      FROM videos v
      INNER JOIN scripts s ON v.script_id = s.id
-     INNER JOIN channels c ON s.language = c.language AND c.enabled = true
+     INNER JOIN channels c ON s.language::TEXT = c.language AND c.enabled = true
      WHERE (
        -- Videos 'failed' se reintentan inmediatamente
        (v.upload_status = 'failed')
