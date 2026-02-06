@@ -131,17 +131,19 @@ if (process.env.RUN_ONCE === "true") {
   startServer();
 
   // Ejecutar pipeline inmediatamente
-  runPipeline()
-    .then(() => {
-      Logger.info("Primera ejecución completada");
-      Logger.info(
-        `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
-      );
-      Logger.info("Esperando siguiente verificación...");
-    })
-    .catch((error) => {
-      Logger.error("Error en primera ejecución:", error);
-    });
+  if (process.env.RUN_CRON === "true") {
+    runPipeline()
+      .then(() => {
+        Logger.info("Primera ejecución completada");
+        Logger.info(
+          `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
+        );
+        Logger.info("Esperando siguiente verificación...");
+      })
+      .catch((error) => {
+        Logger.error("Error en primera ejecución:", error);
+      });
+  }
 
   // Después configurar cron normal
   if (process.env.RUN_CRON === "true") {

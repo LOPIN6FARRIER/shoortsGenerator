@@ -67,11 +67,71 @@ export async function executePipelineFromDB(
 
     Logger.info(`📺 Total de canales activos: ${channels.length}`);
 
-    // Agrupar canales por group_id
+    // Validar canales antes de procesarlos
+    Logger.info("🔍 Validando configuración de canales...");
+    const validChannels: ChannelConfig[] = [];
+    const invalidChannels: Array<{ channel: ChannelConfig; reason: string }> =
+      [];
+
+    for (const channel of channels) {
+      try {
+        // Verificar que tenga prompts de topic
+        const topicPrompts = await getChannelPrompts(channel.id, "topic");
+        if (topicPrompts.length === 0) {
+          invalidChannels.push({
+            channel,
+            reason: "Sin prompts de topic configurados",
+          });
+          continue;
+        }
+
+        // Verificar que tenga prompts de script
+        const scriptPrompts = await getChannelPrompts(channel.id, "script");
+        if (scriptPrompts.length === 0) {
+          invalidChannels.push({
+            channel,
+            reason: "Sin prompts de script configurados",
+          });
+          continue;
+        }
+
+        // Canal válido
+        validChannels.push(channel);
+      } catch (error: any) {
+        invalidChannels.push({
+          channel,
+          reason: `Error validando: ${error.message}`,
+        });
+      }
+    }
+
+    // Mostrar canales inválidos
+    if (invalidChannels.length > 0) {
+      Logger.warn(
+        `⚠️  ${invalidChannels.length} canal(es) saltado(s) por configuración incompleta:`,
+      );
+      invalidChannels.forEach(({ channel, reason }) => {
+        Logger.warn(`   - ${channel.name} (${channel.language}): ${reason}`);
+      });
+      Logger.info("");
+    }
+
+    if (validChannels.length === 0) {
+      Logger.warn("❌ No hay canales válidos para procesar");
+      await completePipelineExecution(executionId, 0);
+      return;
+    }
+
+    Logger.info(
+      `✅ Canales válidos para procesar: ${validChannels.length}/${channels.length}`,
+    );
+    Logger.info("");
+
+    // Agrupar canales válidos por group_id
     const channelGroups = new Map<string, ChannelConfig[]>();
     const independentChannels: ChannelConfig[] = [];
 
-    for (const channel of channels) {
+    for (const channel of validChannels) {
       if (channel.group_id) {
         const groupChannels = channelGroups.get(channel.group_id) || [];
         groupChannels.push(channel);
@@ -87,23 +147,57 @@ export async function executePipelineFromDB(
 
     // Procesar cada grupo de canales (mismo contenido, diferentes idiomas)
     for (const [groupId, groupChannels] of channelGroups.entries()) {
-      Logger.info(`\n${"=".repeat(60)}`);
-      Logger.info(`🔗 PROCESANDO GRUPO: ${groupId}`);
-      Logger.info(
-        `   Canales: ${groupChannels.map((ch) => `${ch.name} (${ch.language})`).join(", ")}`,
-      );
-      Logger.info("=".repeat(60));
+      try {
+        Logger.info(`\n${"=".repeat(60)}`);
+        Logger.info(`🔗 PROCESANDO GRUPO: ${groupId}`);
+        Logger.info(
+          `   Canales: ${groupChannels.map((ch) => `${ch.name} (${ch.language})`).join(", ")}`,
+        );
+        Logger.info("=".repeat(60));
 
-      await processChannelGroup(groupChannels, executionId);
+        await processChannelGroup(groupChannels, executionId);
+      } catch (error: any) {
+        Logger.error(
+          `❌ Error procesando grupo ${groupId}: ${error.message}`,
+        );
+        await logError({
+          execution_id: executionId,
+          error_type: "channel_group_failed",
+          error_message: error.message,
+          stack_trace: error.stack,
+          context: {
+            group_id: groupId,
+            channels: groupChannels.map((ch) => ch.name),
+          },
+        });
+        // Continuar con otros grupos
+      }
     }
 
     // Procesar canales independientes
     for (const channel of independentChannels) {
-      Logger.info(`\n${"=".repeat(60)}`);
-      Logger.info(`📺 PROCESANDO CANAL INDEPENDIENTE: ${channel.name}`);
-      Logger.info("=".repeat(60));
+      try {
+        Logger.info(`\n${"=".repeat(60)}`);
+        Logger.info(`📺 PROCESANDO CANAL INDEPENDIENTE: ${channel.name}`);
+        Logger.info("=".repeat(60));
 
-      await processChannelGroup([channel], executionId);
+        await processChannelGroup([channel], executionId);
+      } catch (error: any) {
+        Logger.error(
+          `❌ Error procesando canal ${channel.name}: ${error.message}`,
+        );
+        await logError({
+          execution_id: executionId,
+          error_type: "independent_channel_failed",
+          error_message: error.message,
+          stack_trace: error.stack,
+          context: {
+            channel_id: channel.id,
+            channel_name: channel.name,
+          },
+        });
+        // Continuar con otros canales independientes
+      }
     }
 
     // Completar pipeline
@@ -144,12 +238,8 @@ async function processChannelGroup(
   Logger.info("\n📝 PASO 1: Generando topic...");
   const firstChannel = channels[0];
 
+  // Prompts ya validados en executePipelineFromDB
   const topicPrompts = await getChannelPrompts(firstChannel.id, "topic");
-  if (topicPrompts.length === 0) {
-    throw new Error(
-      `Canal ${firstChannel.name} no tiene prompts de topic configurados`,
-    );
-  }
 
   const topic = await generateTopic(
     firstChannel.language as "es" | "en",
@@ -164,12 +254,8 @@ async function processChannelGroup(
   const scripts = new Map<string, { script: Script; scriptDbId: string }>();
 
   for (const channel of channels) {
+    // Prompts ya validados en executePipelineFromDB
     const scriptPrompts = await getChannelPrompts(channel.id, "script");
-    if (scriptPrompts.length === 0) {
-      throw new Error(
-        `Canal ${channel.name} no tiene prompts de script configurados`,
-      );
-    }
 
     const script = await generateScriptWithPrompt(
       topic,
