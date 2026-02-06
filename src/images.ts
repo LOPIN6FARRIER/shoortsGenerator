@@ -94,7 +94,7 @@ export async function downloadTopicImages(
     if (CONFIG.unsplash.accessKey) {
       const images = await searchUnsplashImages(topic, count);
       if (images.length > 0) {
-        const downloadedPaths = await downloadImages(images, outputDir);
+        const downloadedPaths = await downloadImages(images, outputDir, topic.id);
 
         // Guardar referencias en BD
         if (downloadedPaths.length > 0) {
@@ -110,7 +110,7 @@ export async function downloadTopicImages(
       Logger.warn("Unsplash no disponible, intentando con Pexels...");
       const images = await searchPexelsImages(topic, count);
       if (images.length > 0) {
-        const downloadedPaths = await downloadImages(images, outputDir);
+        const downloadedPaths = await downloadImages(images, outputDir, topic.id);
 
         // Guardar referencias en BD
         if (downloadedPaths.length > 0) {
@@ -256,13 +256,15 @@ async function searchPexelsImages(
 async function downloadImages(
   images: ImageSource[],
   outputDir: string,
+  topicId: string, // 🆔 Agregar topicId para nombres únicos
 ): Promise<string[]> {
   const downloadedPaths: string[] = [];
 
   for (let i = 0; i < images.length; i++) {
     try {
       const image = images[i];
-      const filename = `image_${i + 1}.jpg`;
+      // 🆔 Incluir topicId en nombre de archivo para evitar sobrescritura
+      const filename = `${topicId}_image_${i + 1}.jpg`;
       const filepath = join(outputDir, filename);
 
       // Si ya existe, no descargar de nuevo
