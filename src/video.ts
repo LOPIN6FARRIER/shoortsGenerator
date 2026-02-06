@@ -86,12 +86,13 @@ export async function generateVideo(
             : channelConfig.video.kenBurns.direction;
 
         const zoomIntensity = channelConfig.video.kenBurns.zoomIntensity;
+        const frameDuration = Math.round(adjustedImageDuration * fps);
 
-        // Ken Burns: zoom gradual
+        // Ken Burns: zoom gradual durante toda la duración de la imagen
         const kenBurnsEffect =
           kenBurnsDirection === "in"
-            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=1:s=${width}x${height}:fps=${fps}`
-            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=1:s=${width}x${height}:fps=${fps}`;
+            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=${frameDuration}:s=${width}x${height}:fps=${fps}`
+            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=${frameDuration}:s=${width}x${height}:fps=${fps}`;
 
         return `[${i}:v]${kenBurnsEffect},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
       })
@@ -112,8 +113,8 @@ export async function generateVideo(
       `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
       `Alignment=2`, // Centrado inferior
       `MarginV=50`, // Margen inferior mínimo
-      `MarginL=150`, // Margen izquierdo amplio para no salirse de pantalla
-      `MarginR=150`, // Margen derecho amplio para no salirse de pantalla
+      `MarginL=180`, // Margen izquierdo amplio para no salirse de pantalla
+      `MarginR=180`, // Margen derecho amplio para no salirse de pantalla
     ].join(",");
 
     filterComplex =

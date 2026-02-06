@@ -92,7 +92,7 @@ export const SPANISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#FFD700", // Dorado vibrante
     secondaryColor: "#FF6B35", // Naranja energético
     fontFamily: "Montserrat", // Sans-serif moderna y legible
-    fontSize: 24, // Reducido para evitar salirse de pantalla
+    fontSize: 22, // Reducido para evitar salirse de pantalla
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
@@ -181,7 +181,7 @@ export const ENGLISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#00D9FF", // Cyan brillante
     secondaryColor: "#7B2FFF", // Púrpura vibrante
     fontFamily: "Montserrat",
-    fontSize: 24, // Reducido para evitar salirse de pantalla
+    fontSize: 22, // Reducido para evitar salirse de pantalla
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
