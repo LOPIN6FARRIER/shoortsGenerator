@@ -2,7 +2,6 @@ import OpenAI from "openai";
 import { Topic } from "./topic.js";
 import { Logger } from "./utils.js";
 import { CONFIG } from "./config.js";
-import { get } from "http";
 import { getLattestScript, getLatestScriptByLanguage } from "./database.js";
 import { getChannelConfig } from "./channels.config.js";
 
@@ -42,7 +41,7 @@ export async function generateScript(
   const languageName = language === "es" ? "español" : "inglés";
 
   // 🔥 PROMPT OPTIMIZADO PARA CONTENIDO VIRAL
-  // Estructura de 3 actos + Hook agresivo + Call-to-curiosity
+  // Estructura de 3 actos + Hook ultra-agresivo + Call-to-curiosity implícito
   const prompt = `Eres un guionista experto en YouTube Shorts virales. Crea un guion de micro-documental sobre:
 
 📌 TEMA: ${topic.title}
@@ -53,47 +52,49 @@ export async function generateScript(
 
 🎯 ESTRUCTURA OBLIGATORIA (3 ACTOS):
 
-[HOOK - ${channelConfig.narrative.hookDuration}s / 8-12 palabras]
-Empieza con uno de estos ganchos:
-${channelConfig.narrative.hookStyle.includes("mystery") ? "• MISTERIO: Una pregunta intrigante o afirmación que rompe expectativas" : ""}
-${channelConfig.narrative.hookStyle.includes("invisible") ? "• INVISIBILIDAD: Algo cotidiano que nadie nota pero está ahí siempre" : ""}
-${channelConfig.narrative.hookStyle.includes("injustice") ? "• INJUSTICIA: Una desigualdad o paradoja del día a día" : ""}
+[HOOK - ${channelConfig.narrative.hookDuration}s / MÁXIMO 12 PALABRAS]
+EMPIEZA CON IMPACTO INMEDIATO:
+${channelConfig.narrative.hookStyle.includes("mystery") ? "• MISTERIO: Afirmación que rompe expectativas sin preguntar" : ""}
+${channelConfig.narrative.hookStyle.includes("invisible") ? "• INVISIBILIDAD: Revela algo oculto en lo cotidiano" : ""}
+${channelConfig.narrative.hookStyle.includes("injustice") ? "• INJUSTICIA: Contraste impactante del día a día" : ""}
 
-Ejemplos de hooks poderosos:
-- "Este trabajo invisible mantiene funcionando tu ciudad."
-- "Nadie sabe quién hace esto, pero todos lo usan."
-- "Mientras tú pagas por esto, ellos lo hacen gratis."
+Ejemplos de hooks ultra-agresivos:
+- "Este trabajo invisible mantiene tu ciudad funcionando."
+- "Nadie ve quién hace esto cada noche."
+- "Pagas por esto mientras otros lo tienen gratis."
 
 [ACTO 1 - ${channelConfig.narrative.act1Duration}s]
-• Presenta el contexto cotidiano
-• Crea familiaridad con algo que todos conocen
-• Usa detalles específicos (fechas, lugares, nombres)
-• Frases cortas y directas (5-8 palabras por frase)
+• Presenta el contexto cotidiano con detalles concretos
+• Crea familiaridad inmediata
+• MÁXIMO 5-7 PALABRAS POR FRASE
+• Usa números, fechas, nombres específicos
 
 [ACTO 2 - ${channelConfig.narrative.act2Duration}s]
-• EL GIRO: La revelación inesperada
-• Datos sorprendentes que cambian la perspectiva
-• El "aha moment" que engancha
-• Mantén el ritmo rápido
+• EL GIRO: Revelación inesperada
+• Datos que cambian la perspectiva por completo
+• El "aha moment" viral
+• MÁXIMO 5-7 PALABRAS POR FRASE
+• Ritmo rápido sin pausas
 
 [ACTO 3 - ${channelConfig.narrative.act3Duration}s]
-• Resignifica el Acto 1 con la nueva información
-• Cierre que genera reflexión
-• CALL-TO-CURIOSITY: Termina con pregunta/reflexión que invite a comentar
+• Resignifica todo con la nueva información
+• Cierre poderoso que genera reflexión
+• CALL-TO-CURIOSITY: Termina con reflexión implícita SIN SIGNOS DE PREGUNTA
+• Ejemplo: "Ahora lo sabes" / "Míralo diferente desde hoy" / "Esto cambia todo"
 
 🚫 PROHIBIDO:
 - "Sabías que...", "Hoy te cuento...", "En este video..."
-- Preguntas retóricas genéricas en el medio
-- Pausas largas o texto descriptivo
-- Listas numeradas o enumeraciones
-- Transiciones obvias ("Pero eso no es todo...")
+- Preguntas con signos de interrogación (? ¿)
+- Pausas largas o transiciones obvias
+- Listas numeradas
+- Frases de más de 7 palabras
 
 ✅ OBLIGATORIO:
 - Tono: ${channelConfig.narrative.emotionalTone}
-- Ritmo: ${channelConfig.narrative.pacing === "fast" ? "Rápido, enérgico, sin pausas" : "Moderado pero dinámico"}
-- Datos concretos y verificables
-- Narrativa continua como si fuera una historia
-- Línea final diseñada para generar comentarios
+- Ritmo: ${channelConfig.narrative.pacing === "fast" ? "Ultra-rápido, enérgico, directo" : "Dinámico sin pausas"}
+- Datos concretos verificables
+- Narrativa fluida como historia continua
+- Cierre diseñado para comentarios (sin pregunta explícita)
 
 Devuelve SOLO el texto narrativo en ${languageName}, sin formato adicional.`;
 
@@ -105,15 +106,30 @@ Devuelve SOLO el texto narrativo en ${languageName}, sin formato adicional.`;
       max_tokens: 450,
     });
 
+    // 🛡️ VALIDACIÓN ROBUSTA: Verificar respuesta antes de usar
+    if (!completion.choices || completion.choices.length === 0) {
+      throw new Error("OpenAI no devolvió opciones de completado");
+    }
+
     const narrative = completion.choices[0]?.message?.content?.trim();
 
     if (!narrative) {
-      throw new Error("OpenAI no devolvió contenido");
+      throw new Error("OpenAI devolvió contenido vacío o null");
     }
 
+    // 📊 EXTRACCIÓN INTERNA DE ESTRUCTURA (sin cambiar interface Script)
+    // Hook: primeras 1-2 frases (≤12 palabras)
+    // Body: actos 1, 2, 3 (núcleo del contenido)
+    // CallToCuriosity: última frase (cierre viral)
+    // NOTE: Actualmente no se almacenan por separado, pero el prompt ya estructura
+    // 🔮 PUNTO DE EXTENSIÓN: A/B testing de hooks diferentes
+    // 🔮 PUNTO DE EXTENSIÓN: Generar variantes de CTA para optimización
+
     const wordCount = narrative.split(/\s+/).length;
+    // ✅ CORRECCIÓN: Cálculo simplificado de duración
+    // palabras / palabrasPorSegundo = segundos totales
     const estimatedDuration = Math.ceil(
-      (wordCount / (channelConfig.subtitles.wordsPerSecond * 60)) * 60,
+      wordCount / channelConfig.subtitles.wordsPerSecond,
     );
 
     // 🔥 TÍTULO OPTIMIZADO PARA CTR (Click-Through Rate)
@@ -142,9 +158,17 @@ Devuelve SOLO el título, sin comillas ni formato adicional.`;
       max_tokens: 40,
     });
 
+    // 🛡️ VALIDACIÓN: Verificar respuesta de título o usar fallback
+    if (!titleCompletion.choices || titleCompletion.choices.length === 0) {
+      Logger.warn("OpenAI no devolvió título, usando fallback del topic");
+    }
+
     const title =
       titleCompletion.choices[0]?.message?.content?.trim() ||
       `${topic.title}`.slice(0, 50);
+
+    // 🔮 PUNTO DE EXTENSIÓN: Generación de subtítulos alternativos
+    // Podría agregarse aquí lógica para A/B testing de diferentes estilos
 
     // Capturar tokens consumidos (narrativa + título)
     const narrativeTokens = completion.usage?.total_tokens || 0;

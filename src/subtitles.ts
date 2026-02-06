@@ -42,7 +42,7 @@ export function generateShortsOptimizedSRT(
     channelConfig.subtitles.wordsPerSecond * 2.0,
   ); // 2.0s por segmento para mejor sincronización
   const totalSegments = Math.ceil(totalWords / wordsPerSegment);
-  
+
   // Ajustar timing para que coincida con la duración real del audio
   const timePerSegment = duration / totalSegments;
 
