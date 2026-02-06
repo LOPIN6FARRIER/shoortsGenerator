@@ -113,12 +113,13 @@ async function searchPexelsVideos(
 
     return data.videos.map((video: any) => {
       // Encontrar el archivo de video más apropiado (HD vertical)
-      const videoFile = video.video_files.find(
-        (file: any) =>
-          file.quality === "hd" &&
-          file.width < file.height && // Vertical
-          file.width >= 720,
-      ) || video.video_files[0]; // Fallback al primero
+      const videoFile =
+        video.video_files.find(
+          (file: any) =>
+            file.quality === "hd" &&
+            file.width < file.height && // Vertical
+            file.width >= 720,
+        ) || video.video_files[0]; // Fallback al primero
 
       return {
         url: video.url,

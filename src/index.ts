@@ -1,6 +1,9 @@
+import "dotenv/config";
 import cron from "node-cron";
 import { executePipeline } from "./pipeline.js";
 import { Logger } from "./utils.js";
+import { initDatabase, getPool } from "./database.js";
+import app from "./api-app.js";
 
 // Exportar funciones principales para uso programático
 export { executePipeline } from "./pipeline.js";
@@ -35,24 +38,64 @@ async function runPipeline(): Promise<void> {
 //   '0 8,20 * * *'  - Diario a las 8:00 AM y 8:00 PM
 
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || "0 10 * * *";
+const API_PORT = process.env.API_PORT || 3001;
+
+async function startServer() {
+  try {
+    // Initialize database
+    initDatabase();
+    const pool = getPool();
+    await pool.query("SELECT NOW();");
+    Logger.success("✅ Conexión a PostgreSQL establecida");
+
+    // Start API server
+    app.listen(API_PORT, () => {
+      Logger.success(`🚀 API corriendo en http://localhost:${API_PORT}`);
+      Logger.info(
+        `📊 Dashboard: ${process.env.DASHBOARD_URL || "http://localhost:4200"}`,
+      );
+    });
+
+    Logger.info("✅ Servidor iniciado correctamente");
+  } catch (error: any) {
+    Logger.error("❌ Error iniciando servidor:", error.message);
+    console.error(error);
+    process.exit(1);
+  }
+}
 
 if (process.env.RUN_ONCE === "true") {
   // Ejecutar una sola vez (útil para testing o ejecución manual)
   Logger.info("Modo ejecución única");
+
+  // Start server first
+  await startServer();
+
+  // Then run pipeline once
   runPipeline()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+    .then(() => {
+      Logger.info("Pipeline completado, servidor API sigue activo");
+    })
+    .catch((error) => {
+      Logger.error("Error en pipeline:", error);
+    });
 } else {
   // Modo cron (ejecución programada)
-  Logger.info(`Cron configurado: ${CRON_SCHEDULE}`);
+
+  // Start server first
+  await startServer();
+
+  Logger.info(`📅 Cron configurado: ${CRON_SCHEDULE}`);
   Logger.info(
     "El generador está esperando la siguiente ejecución programada...",
   );
 
-  cron.schedule(CRON_SCHEDULE, async () => {
-    await runPipeline();
-  });
+  if (process.env.RUNN_CRON === "true") {
+    cron.schedule(CRON_SCHEDULE, async () => {
+      await runPipeline();
+    });
+  }
 
   // Mantener el proceso vivo
-  Logger.info("Presiona Ctrl+C para detener el proceso");
+  Logger.info("✅ Servidor activo - Presiona Ctrl+C para detener");
 }

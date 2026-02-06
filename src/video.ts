@@ -50,7 +50,7 @@ export async function generateVideo(
 
   // Intentar descargar imágenes o videos del topic
   let mediaPaths: string[] = [];
-  
+
   if (CONFIG.video.useVideos && CONFIG.pexels.apiKey) {
     Logger.info("Descargando videos de Pexels...");
     mediaPaths = await downloadPexelsVideos(
@@ -59,7 +59,7 @@ export async function generateVideo(
       3,
     );
   }
-  
+
   // Fallback a imágenes si no hay videos
   if (mediaPaths.length === 0) {
     Logger.info("Descargando imágenes del topic...");
@@ -69,7 +69,7 @@ export async function generateVideo(
       4,
     );
   }
-  
+
   Logger.info(`📷 Medios obtenidos: ${mediaPaths.length}`);
 
   let backgroundInput: string;

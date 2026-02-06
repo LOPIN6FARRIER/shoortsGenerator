@@ -93,6 +93,15 @@ export interface DBTopicImage {
 
 let pool: Pool | null = null;
 
+export function getPool(): Pool {
+  if (!pool) {
+    throw new Error("Database not initialized. Call initDatabase() first.");
+  }
+  return pool;
+}
+
+export { pool };
+
 export function initDatabase(): Pool {
   if (pool) return pool;
 
