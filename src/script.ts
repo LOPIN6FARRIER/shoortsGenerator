@@ -38,17 +38,24 @@ export async function generateScript(
 
   const client = getOpenAIClient();
   const channelConfig = getChannelConfig(language);
-  const languageName = language === "es" ? "español" : "inglés";
+  const languageName =
+    language === "es" ? "español (Spanish)" : "inglés (English)";
+  const languageInstruction =
+    language === "es"
+      ? "IMPORTANTE: Todo el contenido debe estar en ESPAÑOL. No uses palabras en inglés."
+      : "IMPORTANT: All content must be in ENGLISH. Do not use Spanish words.";
 
   // 🔥 PROMPT OPTIMIZADO PARA CONTENIDO VIRAL
   // Estructura de 3 actos + Hook ultra-agresivo + Call-to-curiosity implícito
-  const prompt = `Eres un guionista experto en YouTube Shorts virales. Crea un guion de micro-documental sobre:
+  const prompt = `You are an expert YouTube Shorts scriptwriter. Create a micro-documentary script about:
 
-📌 TEMA: ${topic.title}
-📝 DESCRIPCIÓN: ${topic.description}
-🌐 IDIOMA: ${languageName}
+📌 TOPIC: ${topic.title}
+📝 DESCRIPTION: ${topic.description}
+🌐 LANGUAGE: ${languageName}
 
-⏱️ DURACIÓN OBJETIVO: ${channelConfig.narrative.targetDuration} segundos (130-150 palabras)
+${languageInstruction}
+
+⏱️ TARGET DURATION: ${channelConfig.narrative.targetDuration} seconds (130-150 words)
 
 🎯 ESTRUCTURA OBLIGATORIA (3 ACTOS):
 
@@ -133,9 +140,13 @@ Devuelve SOLO el texto narrativo en ${languageName}, sin formato adicional.`;
     );
 
     // 🔥 TÍTULO OPTIMIZADO PARA CTR (Click-Through Rate)
-    const titlePrompt = `Genera un título VIRAL para YouTube Shorts sobre este contenido en ${languageName}:
+    const titlePrompt =
+      language === "es"
+        ? `Genera un título VIRAL para YouTube Shorts sobre este contenido EN ESPAÑOL:
 
 ${narrative.slice(0, 200)}...
+
+IMPORTANTE: El título debe estar 100% EN ESPAÑOL. No uses palabras en inglés.
 
 REQUISITOS ESTRICTOS:
 - Máximo 50 caracteres (para que se vea completo en móvil)
@@ -149,7 +160,26 @@ Ejemplos buenos:
 - "Nadie sabe quién hace esto"
 - "El secreto detrás de las líneas amarillas"
 
-Devuelve SOLO el título, sin comillas ni formato adicional.`;
+Devuelve SOLO el título en español, sin comillas ni formato adicional.`
+        : `Generate a VIRAL title for YouTube Shorts about this content IN ENGLISH:
+
+${narrative.slice(0, 200)}...
+
+IMPORTANT: The title must be 100% IN ENGLISH. Do not use Spanish words.
+
+STRICT REQUIREMENTS:
+- Maximum 50 characters (to display fully on mobile)
+- Use curiosity-triggering words: "secret", "nobody", "invisible", "hidden"
+- DON'T use: "Did you know...?", "The truth about...", "Discover..."
+- Direct and impactful format
+- Strategic capitalization if applicable
+
+Good examples:
+- "The city's most invisible job"
+- "Nobody knows who does this"
+- "The secret behind yellow lines"
+
+Return ONLY the title in English, without quotes or additional formatting.`;
 
     const titleCompletion = await client.chat.completions.create({
       model: CONFIG.openai.model,
@@ -167,20 +197,62 @@ Devuelve SOLO el título, sin comillas ni formato adicional.`;
       titleCompletion.choices[0]?.message?.content?.trim() ||
       `${topic.title}`.slice(0, 50);
 
+    // � DESCRIPCIÓN OPTIMIZADA PARA SEO Y ENGAGEMENT
+    const descriptionPrompt =
+      language === "es"
+        ? `Genera una descripción para YouTube sobre este contenido EN ESPAÑOL:
+
+${narrative.slice(0, 200)}...
+
+IMPORTANTE: La descripción debe estar 100% EN ESPAÑOL. No uses palabras en inglés.
+
+REQUISITOS:
+- 2-3 oraciones cortas
+- Incluye CTA sutil: "¿Qué opinas?" o "Comenta tu experiencia"
+- Lenguaje cercano y conversacional
+- Máximo 150 caracteres
+
+Devuelve SOLO la descripción en español, sin comillas ni formato adicional.`
+        : `Generate a YouTube description about this content IN ENGLISH:
+
+${narrative.slice(0, 200)}...
+
+IMPORTANT: The description must be 100% IN ENGLISH. Do not use Spanish words.
+
+REQUIREMENTS:
+- 2-3 short sentences
+- Include subtle CTA: "What do you think?" or "Share your experience"
+- Friendly and conversational language
+- Maximum 150 characters
+
+Return ONLY the description in English, without quotes or additional formatting.`;
+
+    const descriptionCompletion = await client.chat.completions.create({
+      model: CONFIG.openai.model,
+      messages: [{ role: "user", content: descriptionPrompt }],
+      temperature: 0.8,
+      max_tokens: 80,
+    });
+
+    const description =
+      descriptionCompletion.choices[0]?.message?.content?.trim() ||
+      topic.description;
+
     // 🔮 PUNTO DE EXTENSIÓN: Generación de subtítulos alternativos
     // Podría agregarse aquí lógica para A/B testing de diferentes estilos
 
-    // Capturar tokens consumidos (narrativa + título)
+    // Capturar tokens consumidos (narrativa + título + descripción)
     const narrativeTokens = completion.usage?.total_tokens || 0;
     const titleTokens = titleCompletion.usage?.total_tokens || 0;
-    const tokensUsed = narrativeTokens + titleTokens;
+    const descriptionTokens = descriptionCompletion.usage?.total_tokens || 0;
+    const tokensUsed = narrativeTokens + titleTokens + descriptionTokens;
 
     const script: Script = {
       language,
       topic,
       title,
       narrative,
-      description: topic.description,
+      description,
       tags: ["shorts", "historia", "curiosidades", "inventos", topic.id],
       estimatedDuration,
       tokensUsed,
