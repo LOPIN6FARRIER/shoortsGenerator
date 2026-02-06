@@ -43,6 +43,10 @@ export interface DBVideo {
   audio_file_path?: string;
   subtitles_file_path?: string;
   processing_time_seconds?: number;
+  upload_status?: "pending" | "uploaded" | "failed" | "quota_exceeded";
+  upload_attempts?: number;
+  last_upload_attempt_at?: Date;
+  upload_error_message?: string;
 }
 
 export interface DBYouTubeUpload {
@@ -537,6 +541,86 @@ export async function getActiveChannels(): Promise<ChannelConfig[]> {
     LEFT JOIN channel_groups g ON c.group_id = g.id
     WHERE c.enabled = true
     ORDER BY c.group_id, c.language`,
+  );
+  return result.rows;
+}
+
+/**
+ * Marca un video como pendiente de upload con información del error
+ */
+export async function markVideoUploadFailed(
+  videoId: string,
+  errorMessage: string,
+  isQuotaError: boolean = false,
+): Promise<void> {
+  const db = getDatabase();
+  const status = isQuotaError ? "quota_exceeded" : "failed";
+  await db.query(
+    `UPDATE videos 
+     SET upload_status = $1, 
+         upload_attempts = COALESCE(upload_attempts, 0) + 1,
+         last_upload_attempt_at = NOW(),
+         upload_error_message = $2
+     WHERE id = $3`,
+    [status, errorMessage, videoId],
+  );
+}
+
+/**
+ * Marca un video como exitosamente subido
+ */
+export async function markVideoUploadSuccess(videoId: string): Promise<void> {
+  const db = getDatabase();
+  await db.query(
+    `UPDATE videos 
+     SET upload_status = 'uploaded', 
+         last_upload_attempt_at = NOW()
+     WHERE id = $1`,
+    [videoId],
+  );
+}
+
+/**
+ * Obtiene videos pendientes de upload (failed o quota_exceeded)
+ * Excluye los que ya tuvieron más de 5 intentos
+ * Videos con quota_exceeded esperan 24 horas antes de reintento
+ */
+export async function getPendingUploadVideos(): Promise<
+  Array<
+    DBVideo & {
+      channel_id: string;
+      channel_name: string;
+      script_title: string;
+      script_description: string;
+      script_tags: string[];
+    }
+  >
+> {
+  const db = getDatabase();
+  const result = await db.query(
+    `SELECT 
+       v.*,
+       s.title as script_title,
+       s.description as script_description,
+       s.tags as script_tags,
+       c.id as channel_id,
+       c.name as channel_name
+     FROM videos v
+     INNER JOIN scripts s ON v.script_id = s.id
+     INNER JOIN channels c ON s.language = c.language AND c.enabled = true
+     WHERE (
+       -- Videos 'failed' se reintentan inmediatamente
+       (v.upload_status = 'failed')
+       OR 
+       -- Videos 'quota_exceeded' esperan 24 horas
+       (v.upload_status = 'quota_exceeded' 
+        AND (v.last_upload_attempt_at IS NULL 
+             OR v.last_upload_attempt_at < NOW() - INTERVAL '24 hours'))
+     )
+       AND COALESCE(v.upload_attempts, 0) < 5
+       AND c.youtube_access_token IS NOT NULL
+     ORDER BY v.last_upload_attempt_at ASC NULLS FIRST
+     LIMIT 50`,
   );
   return result.rows;
 }

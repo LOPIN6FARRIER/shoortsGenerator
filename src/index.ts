@@ -2,6 +2,7 @@ import "dotenv/config";
 import cron from "node-cron";
 import { CronExpressionParser } from "cron-parser";
 import { executePipelineFromDB } from "./pipeline-db.js";
+import { retryPendingUploads } from "./retry-uploads.js";
 import { Logger } from "./utils.js";
 import { initDatabase, getPool, getActiveChannels } from "./database.js";
 import app from "./api-app.js";
@@ -90,6 +91,7 @@ async function runPipeline(): Promise<void> {
 
 // Configuración de cron (personalizable)
 // Cron principal: verifica cada 10 minutos qué canales deben ejecutarse
+// Cron de reintentos: cada 2 horas revisa videos fallidos y reintenta
 // Cada canal tiene su propio cron_schedule en BD
 // Ejemplos de cron por canal:
 //   '0 10 * * *'    - Diario a las 10:00 AM
@@ -98,6 +100,7 @@ async function runPipeline(): Promise<void> {
 //   '0 8,20 * * *'  - Diario a las 8:00 AM y 8:00 PM
 
 const CRON_CHECK_INTERVAL = "*/10 * * * *"; // Cada 10 minutos
+const CRON_RETRY_INTERVAL = "0 */2 * * *"; // Cada 2 horas
 const API_PORT = process.env.API_PORT || 3000;
 
 async function startServer() {
@@ -126,26 +129,36 @@ if (process.env.RUN_ONCE === "true") {
 
   // Start server first
   startServer();
+
   // Ejecutar pipeline inmediatamente
-  if (process.env.RUN_ONCE === "true") {
-    runPipeline()
-      .then(() => {
-        Logger.info("Primera ejecución completada");
-        Logger.info(
-          `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
-        );
-        Logger.info("Esperando siguiente verificación...");
-      })
-      .catch((error) => {
-        Logger.error("Error en primera ejecución:", error);
-      });
-  }
+  runPipeline()
+    .then(() => {
+      Logger.info("Primera ejecución completada");
+      Logger.info(
+        `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
+      );
+      Logger.info("Esperando siguiente verificación...");
+    })
+    .catch((error) => {
+      Logger.error("Error en primera ejecución:", error);
+    });
 
   // Después configurar cron normal
   if (process.env.RUN_CRON === "true") {
+    // Cron principal: verificar canales cada 10 min
     cron.schedule(CRON_CHECK_INTERVAL, async () => {
       await runPipeline();
     });
+
+    // Cron de reintentos: cada 2 horas
+    cron.schedule(CRON_RETRY_INTERVAL, async () => {
+      Logger.info("🔄 Ejecutando job de reintentos...");
+      await retryPendingUploads();
+    });
+
+    Logger.info(
+      `🔄 Job de reintentos configurado: cada 2 horas (${CRON_RETRY_INTERVAL})`,
+    );
   }
 } else {
   // Modo cron (ejecución programada)
@@ -161,9 +174,20 @@ if (process.env.RUN_ONCE === "true") {
   );
 
   if (process.env.RUN_CRON === "true") {
+    // Cron principal: verificar canales cada 10 min
     cron.schedule(CRON_CHECK_INTERVAL, async () => {
       await runPipeline();
     });
+
+    // Cron de reintentos: cada 2 horas
+    cron.schedule(CRON_RETRY_INTERVAL, async () => {
+      Logger.info("🔄 Ejecutando job de reintentos...");
+      await retryPendingUploads();
+    });
+
+    Logger.info(
+      `🔄 Job de reintentos configurado: cada 2 horas (${CRON_RETRY_INTERVAL})`,
+    );
   }
 
   // Mantener el proceso vivo

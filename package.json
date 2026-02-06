@@ -11,7 +11,8 @@
     "auth": "tsx auth-setup.ts",
     "check": "tsx check-system.ts",
     "test:whisper": "tsx test-whisper.ts",
-    "migrate": "tsx run-migrations.ts"
+    "migrate": "tsx run-migrations.ts",
+    "retry": "tsx src/retry-uploads.ts"
   },
   "keywords": [
     "youtube",

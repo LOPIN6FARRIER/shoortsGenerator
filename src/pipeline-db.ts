@@ -26,6 +26,8 @@ import {
   saveResourceUsage,
   logError,
   closeDatabase,
+  markVideoUploadFailed,
+  markVideoUploadSuccess,
   type ChannelConfig,
   type DBResourceUsage,
   getChannelPrompts,
@@ -237,55 +239,107 @@ async function processChannelGroup(
       audio_voice: channel.voice,
       audio_file_path: ttsResult.audioPath,
       subtitles_file_path: srtPath,
+      upload_status: "pending", // Por defecto pending hasta que se suba
+      upload_attempts: 0,
     });
 
     // Upload a YouTube (si está autenticado y no está en modo DEBUG)
     if (channel.youtube_access_token && process.env.DEBUGGING !== "true") {
-      Logger.info("Subiendo a YouTube...");
+      try {
+        Logger.info("Subiendo a YouTube...");
 
-      // Convertir ChannelConfig de BD a formato esperado por uploadToYouTube
-      const legacyChannelConfig = {
-        language: channel.language,
-        youtubeClientId: channel.youtube_client_id || "",
-        youtubeClientSecret: channel.youtube_client_secret || "",
-        youtubeRedirectUri: channel.youtube_redirect_uri || "",
-        youtubeCredentialsPath: "", // No usado cuando pasamos tokens directamente
-      } as any;
+        // Convertir ChannelConfig de BD a formato esperado por uploadToYouTube
+        const legacyChannelConfig = {
+          language: channel.language,
+          youtubeClientId: channel.youtube_client_id || "",
+          youtubeClientSecret: channel.youtube_client_secret || "",
+          youtubeRedirectUri: channel.youtube_redirect_uri || "",
+          youtubeCredentialsPath: "", // No usado cuando pasamos tokens directamente
+        } as any;
 
-      // Tokens desde BD
-      const tokens = {
-        access_token: channel.youtube_access_token,
-        refresh_token: channel.youtube_refresh_token || undefined,
-        expiry_date: channel.youtube_token_expiry || undefined,
-        token_type: channel.youtube_token_type || "Bearer",
-        scope: channel.youtube_scope || undefined,
-      };
+        // Tokens desde BD
+        const tokens = {
+          access_token: channel.youtube_access_token,
+          refresh_token: channel.youtube_refresh_token || undefined,
+          expiry_date: channel.youtube_token_expiry || undefined,
+          token_type: channel.youtube_token_type || "Bearer",
+          scope: channel.youtube_scope || undefined,
+        };
 
-      const uploadResult = await uploadToYouTube(
-        videoResult.videoPath,
-        script,
-        legacyChannelConfig,
-        tokens,
-      );
+        const uploadResult = await uploadToYouTube(
+          videoResult.videoPath,
+          script,
+          legacyChannelConfig,
+          tokens,
+        );
 
-      await saveYouTubeUpload({
-        video_id: videoDbId,
-        youtube_video_id: uploadResult.videoId,
-        youtube_url: uploadResult.url,
-        channel: channel.language as "es" | "en",
-        title: uploadResult.title,
-        privacy_status: "public",
-      });
+        await saveYouTubeUpload({
+          video_id: videoDbId,
+          youtube_video_id: uploadResult.videoId,
+          youtube_url: uploadResult.url,
+          channel: channel.language as "es" | "en",
+          title: uploadResult.title,
+          privacy_status: "public",
+        });
 
-      results.push({
-        channelName: channel.name,
-        language: channel.language,
-        videoPath: videoResult.videoPath,
-        uploadUrl: uploadResult.url,
-        videoId: uploadResult.videoId,
-      });
+        // Marcar video como exitosamente subido
+        await markVideoUploadSuccess(videoDbId);
 
-      Logger.success(`✅ ${channel.name}: ${uploadResult.url}`);
+        results.push({
+          channelName: channel.name,
+          language: channel.language,
+          videoPath: videoResult.videoPath,
+          uploadUrl: uploadResult.url,
+          videoId: uploadResult.videoId,
+        });
+
+        Logger.success(`✅ ${channel.name}: ${uploadResult.url}`);
+      } catch (uploadError: any) {
+        // Si el upload falla, registrar error pero continuar con otros canales
+        Logger.error(
+          `❌ Error subiendo ${channel.name} a YouTube: ${uploadError.message}`,
+        );
+
+        // Verificar si es error de cuota
+        const isQuotaError =
+          uploadError.message.includes("exceeded the number of videos") ||
+          uploadError.message.includes("quota");
+
+        if (isQuotaError) {
+          Logger.warn(
+            `⚠️  Límite de cuota de YouTube alcanzado para ${channel.name}. Se reintentará más tarde.`,
+          );
+        }
+
+        // Marcar video como fallido (se reintentará después)
+        await markVideoUploadFailed(
+          videoDbId,
+          uploadError.message,
+          isQuotaError,
+        );
+
+        // Guardar video localmente aunque el upload falle
+        results.push({
+          channelName: channel.name,
+          language: channel.language,
+          videoPath: videoResult.videoPath,
+        });
+
+        // Registrar error en BD
+        await logError({
+          execution_id: executionId,
+          error_type: "youtube_upload_failed",
+          error_message: uploadError.message,
+          stack_trace: uploadError.stack,
+          context: {
+            channel: channel.name,
+            language: channel.language,
+            video_path: videoResult.videoPath,
+          },
+        });
+
+        Logger.info(`💾 Video guardado localmente: ${videoResult.videoPath}`);
+      }
     } else {
       // Modo DEBUGGING o canal sin autenticación
       if (process.env.DEBUGGING === "true") {
