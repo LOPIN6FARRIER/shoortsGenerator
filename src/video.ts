@@ -87,13 +87,13 @@ export async function generateVideo(
 
         const zoomIntensity = channelConfig.video.kenBurns.zoomIntensity;
 
-        // Ken Burns: zoom gradual - usar fps en lugar de frames totales para mejor compatibilidad con concat
+        // Ken Burns: zoom gradual - usar 1 frame duration para procesamiento continuo del input
         const kenBurnsEffect =
           kenBurnsDirection === "in"
-            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=${fps}:s=${width}x${height}:fps=${fps}`
-            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=${fps}:s=${width}x${height}:fps=${fps}`;
+            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=1:s=${width}x${height}`
+            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=1:s=${width}x${height}`;
 
-        return `[${i}:v]${kenBurnsEffect},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
+        return `[${i}:v]setpts=PTS-STARTPTS,${kenBurnsEffect},fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
       })
       .join(";");
 
