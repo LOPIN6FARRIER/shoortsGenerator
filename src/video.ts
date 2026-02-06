@@ -50,7 +50,8 @@ export async function generateVideo(
 
   // Intentar descargar imágenes o videos del topic
   let mediaPaths: string[] = [];
-  
+  let isVideoMode = false;
+
   if (CONFIG.video.useVideos && CONFIG.pexels.apiKey) {
     Logger.info("Descargando videos de Pexels...");
     mediaPaths = await downloadPexelsVideos(
@@ -58,8 +59,11 @@ export async function generateVideo(
       CONFIG.paths.images,
       3,
     );
+    if (mediaPaths.length > 0) {
+      isVideoMode = true;
+    }
   }
-  
+
   // Fallback a imágenes si no hay videos
   if (mediaPaths.length === 0) {
     Logger.info("Descargando imágenes del topic...");
@@ -68,15 +72,18 @@ export async function generateVideo(
       CONFIG.paths.images,
       4,
     );
+    isVideoMode = false;
   }
-  
-  Logger.info(`📷 Medios obtenidos: ${mediaPaths.length}`);
+
+  Logger.info(
+    `📷 Medios obtenidos: ${mediaPaths.length} (${isVideoMode ? "VIDEOS" : "IMÁGENES"})`,
+  );
 
   let backgroundInput: string;
   let filterComplex: string;
   const imagePaths = mediaPaths; // Por compatibilidad con código existente
 
-  if (imagePaths.length >= 1) {
+  if (imagePaths.length >= 1 && !isVideoMode) {
     // MODO: Slideshow con imágenes + efectos Ken Burns + Pan vertical
     Logger.info(
       `🎬 Generando video con ${imagePaths.length} imágenes + efectos dinámicos...`,
@@ -160,6 +167,167 @@ export async function generateVideo(
     } catch (error: any) {
       Logger.error("Error en slideshow, usando fallback:", error.message);
       // Fallback a gradiente si falla
+      return await generateVideoWithGradient(
+        script,
+        audioPath,
+        srtPath,
+        outputDir,
+        duration,
+      );
+    }
+  } else if (imagePaths.length >= 1 && isVideoMode) {
+    // MODO: Videos de Pexels - reproducir y concatenar
+    Logger.info(
+      `🎬 Generando video con ${imagePaths.length} clips de Pexels...`,
+    );
+
+    const videoDuration = duration / imagePaths.length;
+    const audioIndex = imagePaths.length;
+
+    // Crear inputs de videos
+    const videoInputs = imagePaths.map((p) => `-i "${p}"`).join(" ");
+
+    // Procesar cada video: escalar, recortar y ajustar duración
+    const videoFilters = imagePaths
+      .map((_, i) => {
+        // Cada video se escala y recorta a formato vertical
+        return `[${i}:v]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps},trim=duration=${videoDuration},setpts=PTS-STARTPTS,format=yuv420p[v${i}]`;
+      })
+      .join(";");
+
+    const concatInputs = imagePaths.map((_, i) => `[v${i}]`).join("");
+
+    // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL
+    const subtitleStyle = [
+      `FontName=${channelConfig.visual.fontFamily}`,
+      `FontSize=${channelConfig.visual.fontSize}`,
+      `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
+      `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
+      `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
+      `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
+      `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
+      `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
+      `Alignment=2`, // Centrado inferior
+      `MarginV=50`,
+      `MarginL=180`,
+      `MarginR=180`,
+    ].join(",");
+
+    filterComplex =
+      `${videoFilters};${concatInputs}concat=n=${imagePaths.length}:v=1:a=0[vconcat];` +
+      `[vconcat]subtitles='${srtPath.replace(/\\/g, "/")}':force_style='${subtitleStyle}',` +
+      `colorlevels=rimin=0.05:gimin=0.05:bimin=0.05:rimax=0.95:gimax=0.95:bimax=0.95,` +
+      `eq=contrast=1.05:brightness=0.02:saturation=1.1[outv]`;
+
+    const ffmpegCommand =
+      `ffmpeg ${videoInputs} -i "${audioPath}" ` +
+      `-filter_complex "${filterComplex}" ` +
+      `-map "[outv]" -map ${audioIndex}:a -c:v libx264 -preset medium -crf 22 -c:a aac -b:a 192k ` +
+      `-shortest -pix_fmt yuv420p -movflags +faststart "${outputVideoPath}" -y`;
+
+    try {
+      Logger.info("🎬 Ejecutando FFmpeg con videos de Pexels...");
+      Logger.info(`🔍 DEBUG - Comando FFmpeg:\n${ffmpegCommand}`);
+      await execAsync(ffmpegCommand, { maxBuffer: 1024 * 1024 * 20 });
+
+      Logger.success(`Video generado con clips de Pexels: ${outputVideoPath}`);
+    } catch (error: any) {
+      Logger.error(
+        "Error procesando videos, intentando con imágenes:",
+        error.message,
+      );
+
+      // Fallback 1: Intentar con imágenes
+      try {
+        Logger.info("📷 Intentando descargar imágenes como fallback...");
+        const fallbackImages = await downloadTopicImages(
+          script.topic,
+          CONFIG.paths.images,
+          4,
+        );
+
+        if (fallbackImages.length > 0) {
+          Logger.info(
+            `✅ ${fallbackImages.length} imágenes descargadas, generando video...`,
+          );
+
+          // Usar el mismo código de procesamiento de imágenes
+          const imageDuration = channelConfig.video.imageDisplayTime;
+          const adjustedImageDuration = duration / fallbackImages.length;
+
+          const imageInputs = fallbackImages
+            .map((p) => `-loop 1 -t ${adjustedImageDuration} -i "${p}"`)
+            .join(" ");
+
+          const videoFilters = fallbackImages
+            .map((_, i) => {
+              const kenBurnsDirection =
+                channelConfig.video.kenBurns.direction === "alternate"
+                  ? i % 2 === 0
+                    ? "in"
+                    : "out"
+                  : channelConfig.video.kenBurns.direction;
+
+              const zoomIntensity = channelConfig.video.kenBurns.zoomIntensity;
+
+              const kenBurnsEffect =
+                kenBurnsDirection === "in"
+                  ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=1:s=${width}x${height}`
+                  : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=1:s=${width}x${height}`;
+
+              return `[${i}:v]setpts=PTS-STARTPTS,${kenBurnsEffect},fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
+            })
+            .join(";");
+
+          const concatInputs = fallbackImages.map((_, i) => `[v${i}]`).join("");
+          const audioIndex = fallbackImages.length;
+
+          const subtitleStyle = [
+            `FontName=${channelConfig.visual.fontFamily}`,
+            `FontSize=${channelConfig.visual.fontSize}`,
+            `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
+            `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
+            `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
+            `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
+            `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
+            `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
+            `Alignment=2`,
+            `MarginV=50`,
+            `MarginL=180`,
+            `MarginR=180`,
+          ].join(",");
+
+          const filterComplex =
+            `${videoFilters};${concatInputs}concat=n=${fallbackImages.length}:v=1:a=0[vconcat];` +
+            `[vconcat]subtitles='${srtPath.replace(/\\/g, "/")}':force_style='${subtitleStyle}',` +
+            `colorlevels=rimin=0.05:gimin=0.05:bimin=0.05:rimax=0.95:gimax=0.95:bimax=0.95,` +
+            `eq=contrast=1.05:brightness=0.02:saturation=1.1[outv]`;
+
+          const imageFfmpegCommand =
+            `ffmpeg ${imageInputs} -i "${audioPath}" ` +
+            `-filter_complex "${filterComplex}" ` +
+            `-map "[outv]" -map ${audioIndex}:a -c:v libx264 -preset medium -crf 22 -c:a aac -b:a 192k ` +
+            `-shortest -pix_fmt yuv420p -movflags +faststart "${outputVideoPath}" -y`;
+
+          Logger.info("🎬 Ejecutando FFmpeg con imágenes (fallback)...");
+          await execAsync(imageFfmpegCommand, { maxBuffer: 1024 * 1024 * 20 });
+
+          Logger.success(
+            `Video generado con imágenes (fallback): ${outputVideoPath}`,
+          );
+          return {
+            videoPath: outputVideoPath,
+            width,
+            height,
+            duration,
+          };
+        }
+      } catch (imageError: any) {
+        Logger.error("Error con imágenes fallback:", imageError.message);
+      }
+
+      // Fallback 2: Gradiente si todo lo demás falla
+      Logger.warn("⚠️ Usando gradiente como último recurso");
       return await generateVideoWithGradient(
         script,
         audioPath,

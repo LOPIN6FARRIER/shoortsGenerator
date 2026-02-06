@@ -182,18 +182,20 @@ export async function saveTopic(
 ): Promise<void> {
   const db = getDatabase();
   await db.query(
-    `INSERT INTO topics (id, title, description, image_keywords, execution_id, openai_model, openai_tokens_used, raw_response, generated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO topics (id, title, description, image_keywords, video_keywords, execution_id, openai_model, openai_tokens_used, raw_response, generated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO UPDATE SET
        title = EXCLUDED.title,
        description = EXCLUDED.description,
        image_keywords = EXCLUDED.image_keywords,
+       video_keywords = EXCLUDED.video_keywords,
        execution_id = EXCLUDED.execution_id`,
     [
       topic.id,
       topic.title,
       topic.description,
       topic.imageKeywords,
+      topic.videoKeywords,
       executionId,
       topic.openai_model,
       topic.openai_tokens_used,
@@ -216,7 +218,7 @@ export async function checkDuplicateTopic(title: string): Promise<boolean> {
 export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT $1',
+    'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT $1',
     [limit],
   );
   return result.rows;
@@ -225,7 +227,7 @@ export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
 export async function getLatestTopic(): Promise<Topic | null> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT 1',
+    'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT 1',
   );
   return result.rows[0] || null;
 }
@@ -233,7 +235,7 @@ export async function getLatestTopic(): Promise<Topic | null> {
 export async function getTopicById(topicId: string): Promise<Topic | null> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics WHERE id = $1',
+    'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics WHERE id = $1',
     [topicId],
   );
   return result.rows[0] || null;

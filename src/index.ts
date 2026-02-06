@@ -37,11 +37,24 @@ async function runPipeline(): Promise<void> {
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || "0 10 * * *";
 
 if (process.env.RUN_ONCE === "true") {
-  // Ejecutar una sola vez (útil para testing o ejecución manual)
-  Logger.info("Modo ejecución única");
+  Logger.info("Modo ejecución única al inicio");
+  // Ejecutar inmediatamente
   runPipeline()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+    .then(() => {
+      Logger.info("Primera ejecución completada");
+      Logger.info(`Cron configurado: ${CRON_SCHEDULE}`);
+      Logger.info("Esperando siguiente ejecución programada...");
+    })
+    .catch((error) => {
+      Logger.error("Error en primera ejecución:", error);
+    });
+
+  // Después configurar cron normal
+  cron.schedule(CRON_SCHEDULE, async () => {
+    await runPipeline();
+  });
+
+  Logger.info("Presiona Ctrl+C para detener el proceso");
 } else {
   // Modo cron (ejecución programada)
   Logger.info(`Cron configurado: ${CRON_SCHEDULE}`);
