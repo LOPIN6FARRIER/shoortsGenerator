@@ -231,14 +231,15 @@ export async function executePipeline(): Promise<void> {
     let esScriptId = "";
     let enScriptId = "";
     if (dbHealthy) {
-      if (process.env.DEBBUGING === "true") {
-        // En modo DEBUGGING, obtener el ID del script reutilizado
+      if (process.env.DEBBUGING === "true" && (scripts.es as any).id && (scripts.en as any).id) {
+        // En modo DEBUGGING, obtener el ID del script reutilizado (solo si existen)
         esScriptId = (scripts.es as any).id || "";
         enScriptId = (scripts.en as any).id || "";
         Logger.info(
           `IDs de scripts reutilizados: ES=${esScriptId}, EN=${enScriptId}`,
         );
       } else {
+        // Guardar scripts nuevos (tanto en DEBUGGING como en producción)
         const esTokens = scripts.es.tokensUsed || 0;
         const enTokens = scripts.en.tokensUsed || 0;
 
@@ -254,7 +255,15 @@ export async function executePipeline(): Promise<void> {
         });
         totalTokens += esTokens + enTokens;
         Logger.info(`Tokens scripts: ES=${esTokens}, EN=${enTokens}`);
+        Logger.info(`Scripts guardados: ES=${esScriptId}, EN=${enScriptId}`);
       }
+    }
+
+    // Validar que tenemos IDs válidos antes de continuar
+    if (dbHealthy && (!esScriptId || !enScriptId)) {
+      throw new Error(
+        `IDs de scripts inválidos: ES="${esScriptId}", EN="${enScriptId}"`,
+      );
     }
 
     // PASO 3: Canal Español
