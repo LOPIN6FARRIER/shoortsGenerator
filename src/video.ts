@@ -50,11 +50,12 @@ export async function generateVideo(
   // Intentar descargar imágenes del topic
   Logger.info("Descargando imágenes del topic...");
   const imagePaths = await downloadTopicImages(script.topic, outputDir, 4);
+  Logger.info(`📷 Imágenes obtenidas: ${imagePaths.length}`);
 
   let backgroundInput: string;
   let filterComplex: string;
 
-  if (imagePaths.length >= 3) {
+  if (imagePaths.length >= 1) {
     // MODO: Slideshow con imágenes + efectos Ken Burns + Pan vertical
     Logger.info(
       `🎬 Generando video con ${imagePaths.length} imágenes + efectos dinámicos...`,

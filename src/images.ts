@@ -68,7 +68,11 @@ export async function downloadTopicImages(
           `⚠️  Solo ${validImages.length}/${existingImages.length} imágenes existen en disco`,
         );
         if (validImages.length >= count) {
+          Logger.info(`✅ Suficientes imágenes válidas (${validImages.length}), reutilizando...`);
           return validImages.slice(0, count).map((img) => img.file_path);
+        } else {
+          Logger.warn(`❌ Imágenes insuficientes (${validImages.length}/${count}), descargando nuevas...`);
+          // NO retornar, continuar para descargar nuevas
         }
       }
     }
