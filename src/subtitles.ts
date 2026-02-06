@@ -99,7 +99,7 @@ export function generateShortsOptimizedSRT(
 
 /**
  * Divide texto en líneas respetando límite de caracteres
- * Intenta cortar por palabras completas
+ * Maneja palabras largas y evita pérdida de contenido
  */
 function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
   const words = text.split(" ");
@@ -107,11 +107,23 @@ function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
   let currentLine = "";
 
   words.forEach((word) => {
+    // Si la palabra sola es más larga que el máximo, truncarla
+    if (word.length > maxCharsPerLine) {
+      if (currentLine) {
+        lines.push(currentLine);
+        currentLine = "";
+      }
+      // Truncar palabra larga y continuar
+      lines.push(word.substring(0, maxCharsPerLine - 3) + "...");
+      return;
+    }
+
     const testLine = currentLine ? `${currentLine} ${word}` : word;
 
     if (testLine.length <= maxCharsPerLine) {
       currentLine = testLine;
     } else {
+      // Línea completa, guardarla y empezar nueva
       if (currentLine) {
         lines.push(currentLine);
       }
@@ -119,6 +131,7 @@ function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
     }
   });
 
+  // Agregar última línea si existe
   if (currentLine) {
     lines.push(currentLine);
   }
