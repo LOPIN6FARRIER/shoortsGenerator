@@ -65,20 +65,11 @@ async function startServer() {
 }
 
 if (process.env.RUN_ONCE === "true") {
-  // Ejecutar una sola vez (útil para testing o ejecución manual)
-  Logger.info("Modo ejecución única");
-
-  // Start server first
-  await startServer();
-
-  // Then run pipeline once
+  Logger.info("Modo ejecución única al inicio");
+  // Ejecutar inmediatamente
   runPipeline()
-    .then(() => {
-      Logger.info("Pipeline completado, servidor API sigue activo");
-    })
-    .catch((error) => {
-      Logger.error("Error en pipeline:", error);
-    });
+    .then(() => process.exit(0))
+    .catch(() => process.exit(1));
 } else {
   // Modo cron (ejecución programada)
 

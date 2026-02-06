@@ -78,14 +78,14 @@ export async function downloadPexelsVideos(
  * Extrae keywords simples para búsqueda de videos
  */
 function extractVideoKeywords(topic: Topic): string {
-  // Usar imageKeywords si existen, sino extraer del título
-  if (topic.imageKeywords) {
-    return topic.imageKeywords.split(",")[0].trim();
-  }
-
-  // Extraer primeras 2-3 palabras del título
-  const words = topic.title.toLowerCase().split(" ");
-  return words.slice(0, 3).join(" ");
+  // Usar videoKeywords que ya vienen generadas por la IA específicamente para videos
+  // Tomar las primeras 2-3 keywords más relevantes
+  const keywords = topic.videoKeywords
+    .split(",")
+    .slice(0, 3)
+    .map((k) => k.trim())
+    .join(" ");
+  return keywords;
 }
 
 /**

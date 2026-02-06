@@ -8,6 +8,7 @@ export interface Topic {
   title: string;
   description: string;
   imageKeywords: string; // Keywords para búsqueda de imágenes en Unsplash/Pexels
+  videoKeywords: string; // Keywords para búsqueda de videos en Pexels
   timestamp: string;
   tokensUsed?: number;
 }
@@ -60,7 +61,8 @@ Return ONLY valid JSON with:
   "id": string,
   "title": string,
   "description": string,
-  "imageKeywords": string (ONLY 2-3 simple keywords in English for Unsplash search. Examples: "library books", "laundry machine", "parking lot aerial", "coffee shop". NO commas, NO long phrases)
+  "imageKeywords": string (ONLY 2-3 simple keywords in English for Unsplash search. Examples: "library books", "laundry machine", "parking lot aerial", "coffee shop". NO commas, NO long phrases),
+  "videoKeywords": string (ONLY 2-3 simple keywords in English for Pexels VIDEO search. Use action-related terms. Examples: "workers painting", "machines working", "people walking", "water flowing". NO commas, NO long phrases)
 }`;
 
   try {
@@ -102,6 +104,8 @@ Return ONLY valid JSON with:
       title: parsed.title,
       description: parsed.description,
       imageKeywords: parsed.imageKeywords || parsed.title, // Fallback al título si no hay keywords
+      videoKeywords:
+        parsed.videoKeywords || parsed.imageKeywords || parsed.title, // Fallback a imageKeywords o título
       timestamp: new Date().toISOString(),
       tokensUsed,
     };
