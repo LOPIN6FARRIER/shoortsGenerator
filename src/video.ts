@@ -90,13 +90,8 @@ export async function generateVideo(
         // Ken Burns: zoom gradual
         const kenBurnsEffect =
           kenBurnsDirection === "in"
-            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=${adjustedImageDuration * fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}`
-            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=${adjustedImageDuration * fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${width}x${height}`;
-
-        // Pan vertical suave (opcional)
-        const panEffect = channelConfig.video.pan.enabled
-          ? `,crop=iw:ih*0.8:0:'if(lte(t,${adjustedImageDuration}/2),0,ih*0.2*(t-${adjustedImageDuration}/2)/(${adjustedImageDuration}/2))' `
-          : "";
+            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=1:s=${width}x${height}:fps=${fps}`
+            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=1:s=${width}x${height}:fps=${fps}`;
 
         return `[${i}:v]${kenBurnsEffect},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
       })
@@ -117,8 +112,8 @@ export async function generateVideo(
       `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
       `Alignment=2`, // Centrado inferior
       `MarginV=50`, // Margen inferior mínimo
-      `MarginL=120`, // Margen izquierdo amplio para no salirse de pantalla
-      `MarginR=120`, // Margen derecho amplio para no salirse de pantalla
+      `MarginL=150`, // Margen izquierdo amplio para no salirse de pantalla
+      `MarginR=150`, // Margen derecho amplio para no salirse de pantalla
     ].join(",");
 
     filterComplex =
@@ -137,12 +132,13 @@ export async function generateVideo(
       Logger.info(
         "🎬 Ejecutando FFmpeg con efectos Ken Burns + Pan vertical...",
       );
+      Logger.info(`🔍 DEBUG - Comando FFmpeg:\n${ffmpegCommand}`);
       await execAsync(ffmpegCommand, { maxBuffer: 1024 * 1024 * 20 });
 
-      // Limpiar imágenes temporales
-      imagePaths.forEach((path) => {
-        if (existsSync(path)) unlinkSync(path);
-      });
+      // 💾 NO limpiar imágenes - se reutilizan de assets/images
+      // imagePaths.forEach((path) => {
+      //   if (existsSync(path)) unlinkSync(path);
+      // });
 
       Logger.success(`Video generado con slideshow: ${outputVideoPath}`);
     } catch (error: any) {
