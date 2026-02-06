@@ -92,11 +92,11 @@ export const SPANISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#FFD700", // Dorado vibrante
     secondaryColor: "#FF6B35", // Naranja energético
     fontFamily: "Montserrat", // Sans-serif moderna y legible
-    fontSize: 32, // Reducido drásticamente para evitar salirse de pantalla
+    fontSize: 28, // Reducido para evitar salirse de pantalla
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
-      strokeWidth: 2, // Reducido para que el borde no agrande el texto
+      strokeWidth: 1.5, // Reducido para que el borde no agrande el texto
       shadowOpacity: 0.8,
       backgroundColor: "#000000",
       backgroundOpacity: 0.5,
@@ -152,7 +152,7 @@ export const SPANISH_CHANNEL: ChannelIdentity = {
 
   subtitles: {
     maxLines: 2,
-    maxCharsPerLine: 16, // Balance entre legibilidad y no perder palabras
+    maxCharsPerLine: 18, // Balance entre legibilidad y no perder palabras
     wordsPerSecond: 2.8, // Ritmo rápido
     emphasizeKeywords: true,
     keywordIndicators: [
@@ -181,11 +181,11 @@ export const ENGLISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#00D9FF", // Cyan brillante
     secondaryColor: "#7B2FFF", // Púrpura vibrante
     fontFamily: "Montserrat",
-    fontSize: 32, // Reducido drásticamente para evitar salirse de pantalla
+    fontSize: 28, // Reducido para evitar salirse de pantalla
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
-      strokeWidth: 2, // Reducido para que el borde no agrande el texto
+      strokeWidth: 1.5, // Reducido para que el borde no agrande el texto
       shadowOpacity: 0.8,
       backgroundColor: "#000000",
       backgroundOpacity: 0.5,
@@ -237,7 +237,7 @@ export const ENGLISH_CHANNEL: ChannelIdentity = {
 
   subtitles: {
     maxLines: 2,
-    maxCharsPerLine: 14, // Balance entre legibilidad y no perder palabras
+    maxCharsPerLine: 18, // Balance entre legibilidad y no perder palabras
     wordsPerSecond: 3.0, // Ritmo más rápido en inglés
     emphasizeKeywords: true,
     keywordIndicators: [

@@ -101,7 +101,7 @@ export function generateShortsOptimizedSRT(
 
 /**
  * Divide texto en líneas respetando límite de caracteres
- * Maneja palabras largas y evita pérdida de contenido
+ * Maneja palabras largas de manera inteligente
  */
 function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
   const words = text.split(" ");
@@ -109,14 +109,22 @@ function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
   let currentLine = "";
 
   words.forEach((word) => {
-    // Si la palabra sola es más larga que el máximo, truncarla
+    // Si la palabra sola es más larga que el máximo, dividirla con guion
     if (word.length > maxCharsPerLine) {
       if (currentLine) {
-        lines.push(currentLine);
+        lines.push(currentLine.trim());
         currentLine = "";
       }
-      // Truncar palabra larga y continuar
-      lines.push(word.substring(0, maxCharsPerLine - 3) + "...");
+      // Dividir palabra larga en partes con guion
+      const chunkSize = maxCharsPerLine - 1; // Espacio para el guion
+      for (let i = 0; i < word.length; i += chunkSize) {
+        const chunk = word.substring(i, i + chunkSize);
+        if (i + chunkSize < word.length) {
+          lines.push(chunk + "-");
+        } else {
+          currentLine = chunk;
+        }
+      }
       return;
     }
 
@@ -127,7 +135,7 @@ function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
     } else {
       // Línea completa, guardarla y empezar nueva
       if (currentLine) {
-        lines.push(currentLine);
+        lines.push(currentLine.trim());
       }
       currentLine = word;
     }
@@ -135,7 +143,7 @@ function splitIntoLines(text: string, maxCharsPerLine: number): string[] {
 
   // Agregar última línea si existe
   if (currentLine) {
-    lines.push(currentLine);
+    lines.push(currentLine.trim());
   }
 
   return lines;

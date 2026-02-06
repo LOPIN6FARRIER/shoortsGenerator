@@ -117,8 +117,8 @@ export async function generateVideo(
       `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
       `Alignment=2`, // Centrado inferior
       `MarginV=50`, // Margen inferior mínimo
-      `MarginL=80`, // Margen izquierdo amplio para no salirse de pantalla
-      `MarginR=80`, // Margen derecho amplio para no salirse de pantalla
+      `MarginL=120`, // Margen izquierdo amplio para no salirse de pantalla
+      `MarginR=120`, // Margen derecho amplio para no salirse de pantalla
     ].join(",");
 
     filterComplex =
