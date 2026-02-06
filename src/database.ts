@@ -430,8 +430,8 @@ export async function saveTopicImages(images: DBTopicImage[]): Promise<void> {
 
   for (const img of images) {
     await db.query(
-      `INSERT INTO topic_images (topic_id, file_path, source_url, source_platform, unsplash_photo_id, pexels_photo_id, photographer_name, photographer_url, download_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO topic_images (id, topic_id, file_path, source_url, source_platform, unsplash_photo_id, pexels_photo_id, photographer_name, photographer_url, download_order)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (topic_id, download_order) DO UPDATE SET
          file_path = EXCLUDED.file_path,
          source_url = EXCLUDED.source_url`,

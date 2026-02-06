@@ -92,7 +92,7 @@ export const SPANISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#FFD700", // Dorado vibrante
     secondaryColor: "#FF6B35", // Naranja energético
     fontFamily: "Montserrat", // Sans-serif moderna y legible
-    fontSize: 38, // Reducido aún más para evitar cortes en bordes
+    fontSize: 36, // Reducido al mínimo para evitar cortes
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
@@ -152,7 +152,7 @@ export const SPANISH_CHANNEL: ChannelIdentity = {
 
   subtitles: {
     maxLines: 2,
-    maxCharsPerLine: 15,          // Ultra-conservador para evitar cortes laterales
+    maxCharsPerLine: 12, // Ultra-ultra conservador para evitar cualquier corte
     wordsPerSecond: 2.8, // Ritmo rápido
     emphasizeKeywords: true,
     keywordIndicators: [
@@ -181,7 +181,7 @@ export const ENGLISH_CHANNEL: ChannelIdentity = {
     primaryColor: "#00D9FF", // Cyan brillante
     secondaryColor: "#7B2FFF", // Púrpura vibrante
     fontFamily: "Montserrat",
-    fontSize: 38, // Reducido aún más para evitar cortes en bordes
+    fontSize: 36, // Reducido al mínimo para evitar cortes
     subtitleStyle: {
       fontWeight: "bold",
       strokeColor: "#000000",
@@ -237,7 +237,7 @@ export const ENGLISH_CHANNEL: ChannelIdentity = {
 
   subtitles: {
     maxLines: 2,
-    maxCharsPerLine: 13,          // Ultra-conservador para evitar cortes laterales
+    maxCharsPerLine: 11, // Ultra-ultra conservador para evitar cualquier corte
     wordsPerSecond: 3.0, // Ritmo más rápido en inglés
     emphasizeKeywords: true,
     keywordIndicators: [
