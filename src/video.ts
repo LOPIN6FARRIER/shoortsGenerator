@@ -86,13 +86,12 @@ export async function generateVideo(
             : channelConfig.video.kenBurns.direction;
 
         const zoomIntensity = channelConfig.video.kenBurns.zoomIntensity;
-        const frameDuration = Math.round(adjustedImageDuration * fps);
 
-        // Ken Burns: zoom gradual durante toda la duración de la imagen
+        // Ken Burns: zoom gradual - usar fps en lugar de frames totales para mejor compatibilidad con concat
         const kenBurnsEffect =
           kenBurnsDirection === "in"
-            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=${frameDuration}:s=${width}x${height}:fps=${fps}`
-            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=${frameDuration}:s=${width}x${height}:fps=${fps}`;
+            ? `zoompan=z='min(zoom+0.0015,${zoomIntensity})':d=${fps}:s=${width}x${height}:fps=${fps}`
+            : `zoompan=z='if(lte(zoom,1.0),${zoomIntensity},max(1.001,zoom-0.0015))':d=${fps}:s=${width}x${height}:fps=${fps}`;
 
         return `[${i}:v]${kenBurnsEffect},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,format=yuv420p[v${i}]`;
       })
