@@ -49,20 +49,27 @@ async function runPipeline(): Promise<void> {
       return;
     }
 
-    // Filtrar canales que deben ejecutarse ahora según su cron_schedule
-    const channelsToExecute = allChannels.filter((channel) => {
-      const shouldRun = shouldExecuteNow(channel.cron_schedule);
-      if (shouldRun) {
-        Logger.info(
-          `✅ ${channel.name}: programado para ejecutarse (${channel.cron_schedule})`,
-        );
-      } else {
-        Logger.info(
-          `⏭️  ${channel.name}: no corresponde ejecutar (${channel.cron_schedule})`,
-        );
-      }
-      return shouldRun;
-    });
+    let channelsToExecute = [];
+    if (process.env.RUN_ONCE !== "true") {
+      channelsToExecute = allChannels.filter((channel) => {
+        const shouldRun = shouldExecuteNow(channel.cron_schedule);
+        if (shouldRun) {
+          Logger.info(
+            `✅ ${channel.name}: programado para ejecutarse (${channel.cron_schedule})`,
+          );
+        } else {
+          Logger.info(
+            `⏭️  ${channel.name}: no corresponde ejecutar (${channel.cron_schedule})`,
+          );
+        }
+        return shouldRun;
+      });
+    } else {
+      Logger.info(
+        "Modo ejecución única: ejecutando para todos los canales activos",
+      );
+      channelsToExecute = allChannels;
+    }
 
     if (channelsToExecute.length === 0) {
       Logger.info("No hay canales programados para esta ventana de tiempo");
