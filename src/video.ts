@@ -7,6 +7,7 @@ import { Logger } from "./utils.js";
 import { CONFIG } from "./config.js";
 import { Script } from "./script.js";
 import { downloadTopicImages } from "./images.js";
+import { downloadPexelsVideos } from "./videos.js";
 import { getChannelConfig } from "./channels.config.js";
 
 const execAsync = promisify(exec);
@@ -47,18 +48,33 @@ export async function generateVideo(
   const { stdout } = await execAsync(durationCommand);
   const duration = parseFloat(stdout.trim());
 
-  // Intentar descargar imágenes del topic
-  Logger.info("Descargando imágenes del topic...");
-  // 💾 Usar carpeta persistente para imágenes (no cambia entre ejecuciones)
-  const imagePaths = await downloadTopicImages(
-    script.topic,
-    CONFIG.paths.images,
-    4,
-  );
-  Logger.info(`📷 Imágenes obtenidas: ${imagePaths.length}`);
+  // Intentar descargar imágenes o videos del topic
+  let mediaPaths: string[] = [];
+  
+  if (CONFIG.video.useVideos && CONFIG.pexels.apiKey) {
+    Logger.info("Descargando videos de Pexels...");
+    mediaPaths = await downloadPexelsVideos(
+      script.topic,
+      CONFIG.paths.images,
+      3,
+    );
+  }
+  
+  // Fallback a imágenes si no hay videos
+  if (mediaPaths.length === 0) {
+    Logger.info("Descargando imágenes del topic...");
+    mediaPaths = await downloadTopicImages(
+      script.topic,
+      CONFIG.paths.images,
+      4,
+    );
+  }
+  
+  Logger.info(`📷 Medios obtenidos: ${mediaPaths.length}`);
 
   let backgroundInput: string;
   let filterComplex: string;
+  const imagePaths = mediaPaths; // Por compatibilidad con código existente
 
   if (imagePaths.length >= 1) {
     // MODO: Slideshow con imágenes + efectos Ken Burns + Pan vertical

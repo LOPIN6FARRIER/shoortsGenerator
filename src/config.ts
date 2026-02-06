@@ -52,6 +52,7 @@ export const CONFIG = {
     height: parseInt(process.env.VIDEO_HEIGHT || "1920"),
     fps: parseInt(process.env.VIDEO_FPS || "30"),
     maxDuration: parseInt(process.env.VIDEO_DURATION || "60"),
+    useVideos: process.env.USE_PEXELS_VIDEOS === "true", // Usar videos en lugar de imágenes
   },
 
   unsplash: {
