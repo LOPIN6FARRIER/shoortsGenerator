@@ -10,6 +10,7 @@ assets/images/
 *.srt
 credentials-*.json
 
-# Database schemas (contain credentials)
+# Database schemas and migrations (contain credentials/sensitive data)
 database/schema.sql
 database/add_*.sql
+database/migrations/*.sql

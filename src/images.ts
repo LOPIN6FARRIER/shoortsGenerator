@@ -167,6 +167,17 @@ async function saveImageReferences(
 }
 
 /**
+ * Extrae keywords relevantes del topic para búsqueda de imágenes
+ * Usa las keywords generadas por OpenAI para mejor precisión
+ */
+function extractImageKeywords(topic: Topic): string {
+  // Usar las keywords generadas por OpenAI (siempre en inglés y optimizadas)
+  const keywords = topic.imageKeywords || topic.title;
+  Logger.info(`🔍 Usando keywords de IA para búsqueda: "${keywords}"`);
+  return keywords;
+}
+
+/**
  * Busca imágenes en Unsplash
  */
 async function searchUnsplashImages(
@@ -174,7 +185,9 @@ async function searchUnsplashImages(
   count: number,
 ): Promise<ImageSource[]> {
   try {
-    const searchQuery = encodeURIComponent(topic.title);
+    // Extraer keywords relevantes para búsqueda visual
+    const keywords = extractImageKeywords(topic);
+    const searchQuery = encodeURIComponent(keywords);
     const url = `https://api.unsplash.com/search/photos?query=${searchQuery}&per_page=${count}&orientation=portrait`;
 
     const response = await fetch(url, {

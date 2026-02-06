@@ -7,6 +7,7 @@ export interface Topic {
   id: string;
   title: string;
   description: string;
+  imageKeywords: string; // Keywords para búsqueda de imágenes en Unsplash/Pexels
   timestamp: string;
   tokensUsed?: number;
 }
@@ -58,7 +59,8 @@ Return ONLY valid JSON with:
 {
   "id": string,
   "title": string,
-  "description": string
+  "description": string,
+  "imageKeywords": string (3-5 visual search keywords in English for finding relevant stock photos on Unsplash/Pexels. Examples: "parking lot aerial view", "coffee shop barista", "warehouse workers logistics")
 }`;
 
   try {
@@ -99,6 +101,7 @@ Return ONLY valid JSON with:
       id: titleToKebabCase(parsed.title),
       title: parsed.title,
       description: parsed.description,
+      imageKeywords: parsed.imageKeywords || parsed.title, // Fallback al título si no hay keywords
       timestamp: new Date().toISOString(),
       tokensUsed,
     };
