@@ -94,7 +94,11 @@ export async function downloadTopicImages(
     if (CONFIG.unsplash.accessKey) {
       const images = await searchUnsplashImages(topic, count);
       if (images.length > 0) {
-        const downloadedPaths = await downloadImages(images, outputDir, topic.id);
+        const downloadedPaths = await downloadImages(
+          images,
+          outputDir,
+          topic.id,
+        );
 
         // Guardar referencias en BD
         if (downloadedPaths.length > 0) {
@@ -110,7 +114,11 @@ export async function downloadTopicImages(
       Logger.warn("Unsplash no disponible, intentando con Pexels...");
       const images = await searchPexelsImages(topic, count);
       if (images.length > 0) {
-        const downloadedPaths = await downloadImages(images, outputDir, topic.id);
+        const downloadedPaths = await downloadImages(
+          images,
+          outputDir,
+          topic.id,
+        );
 
         // Guardar referencias en BD
         if (downloadedPaths.length > 0) {
