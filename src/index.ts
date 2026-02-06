@@ -1,12 +1,13 @@
 import "dotenv/config";
 import cron from "node-cron";
-import { executePipeline } from "./pipeline.js";
+import { CronExpressionParser } from "cron-parser";
+import { executePipelineFromDB } from "./pipeline-db.js";
 import { Logger } from "./utils.js";
-import { initDatabase, getPool } from "./database.js";
+import { initDatabase, getPool, getActiveChannels } from "./database.js";
 import app from "./api-app.js";
 
 // Exportar funciones principales para uso programático
-export { executePipeline } from "./pipeline.js";
+export { executePipelineFromDB } from "./pipeline-db.js";
 export { generateTopic } from "./topic.js";
 export { generateScript, generateBilingualScripts } from "./script.js";
 export { generateTTS, checkEdgeTTS } from "./tts.js";
@@ -16,10 +17,62 @@ export { uploadToYouTube, checkCredentials } from "./upload.js";
 export { CONFIG } from "./config.js";
 export { Logger } from "./utils.js";
 
+/**
+ * Evalúa si un cron schedule debe ejecutarse en este momento
+ * Compara la próxima ejecución con la ventana de verificación (10 min)
+ */
+function shouldExecuteNow(cronSchedule: string): boolean {
+  try {
+    const interval = CronExpressionParser.parse(cronSchedule);
+    const nextRun = interval.next().toDate();
+    const now = new Date();
+    const diff = nextRun.getTime() - now.getTime();
+
+    // Si la próxima ejecución es dentro de los próximos 10 minutos, ejecutar
+    const TEN_MINUTES = 10 * 60 * 1000;
+    return diff >= 0 && diff <= TEN_MINUTES;
+  } catch (error) {
+    Logger.error(`Error evaluando cron schedule: ${cronSchedule}`, error);
+    return false;
+  }
+}
+
 async function runPipeline(): Promise<void> {
   try {
-    Logger.info("=== INICIANDO GENERACIÓN DE YOUTUBE SHORTS ===");
-    await executePipeline();
+    Logger.info("=== VERIFICANDO CANALES PROGRAMADOS ===");
+
+    // Obtener TODOS los canales activos desde BD
+    const allChannels = await getActiveChannels();
+
+    if (allChannels.length === 0) {
+      Logger.warn("No hay canales activos configurados");
+      return;
+    }
+
+    // Filtrar canales que deben ejecutarse ahora según su cron_schedule
+    const channelsToExecute = allChannels.filter((channel) => {
+      const shouldRun = shouldExecuteNow(channel.cron_schedule);
+      if (shouldRun) {
+        Logger.info(
+          `✅ ${channel.name}: programado para ejecutarse (${channel.cron_schedule})`,
+        );
+      } else {
+        Logger.info(
+          `⏭️  ${channel.name}: no corresponde ejecutar (${channel.cron_schedule})`,
+        );
+      }
+      return shouldRun;
+    });
+
+    if (channelsToExecute.length === 0) {
+      Logger.info("No hay canales programados para esta ventana de tiempo");
+      return;
+    }
+
+    Logger.info(
+      `\n🚀 Ejecutando pipeline para ${channelsToExecute.length} canal(es)`,
+    );
+    await executePipelineFromDB(channelsToExecute);
     Logger.success("Pipeline completado exitosamente");
   } catch (error: any) {
     Logger.error("ERROR FATAL EN EL PIPELINE:", error.message);
@@ -29,16 +82,16 @@ async function runPipeline(): Promise<void> {
 }
 
 // Configuración de cron (personalizable)
-// Por defecto: Ejecutar todos los días a las 10:00 AM
-// Formato: segundo minuto hora día mes día-semana
-// Ejemplos:
+// Cron principal: verifica cada 10 minutos qué canales deben ejecutarse
+// Cada canal tiene su propio cron_schedule en BD
+// Ejemplos de cron por canal:
 //   '0 10 * * *'    - Diario a las 10:00 AM
 //   '0 */6 * * *'   - Cada 6 horas
 //   '0 0 * * 0'     - Cada domingo a medianoche
 //   '0 8,20 * * *'  - Diario a las 8:00 AM y 8:00 PM
 
-const CRON_SCHEDULE = process.env.CRON_SCHEDULE || "0 10 * * *";
-const API_PORT = process.env.API_PORT || 3001;
+const CRON_CHECK_INTERVAL = "*/10 * * * *"; // Cada 10 minutos
+const API_PORT = process.env.API_PORT || 3000;
 
 async function startServer() {
   try {
@@ -51,9 +104,6 @@ async function startServer() {
     // Start API server
     app.listen(API_PORT, () => {
       Logger.success(`🚀 API corriendo en http://localhost:${API_PORT}`);
-      Logger.info(
-        `📊 Dashboard: ${process.env.DASHBOARD_URL || "http://localhost:4200"}`,
-      );
     });
 
     Logger.info("✅ Servidor iniciado correctamente");
@@ -66,23 +116,45 @@ async function startServer() {
 
 if (process.env.RUN_ONCE === "true") {
   Logger.info("Modo ejecución única al inicio");
-  // Ejecutar inmediatamente
-  runPipeline()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+
+  // Start server first
+  startServer();
+  // Ejecutar pipeline inmediatamente
+  if (process.env.RUN_ONCE === "true") {
+    runPipeline()
+      .then(() => {
+        Logger.info("Primera ejecución completada");
+        Logger.info(
+          `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
+        );
+        Logger.info("Esperando siguiente verificación...");
+      })
+      .catch((error) => {
+        Logger.error("Error en primera ejecución:", error);
+      });
+  }
+
+  // Después configurar cron normal
+  if (process.env.RUN_CRON === "true") {
+    cron.schedule(CRON_CHECK_INTERVAL, async () => {
+      await runPipeline();
+    });
+  }
 } else {
   // Modo cron (ejecución programada)
 
   // Start server first
   await startServer();
 
-  Logger.info(`📅 Cron configurado: ${CRON_SCHEDULE}`);
   Logger.info(
-    "El generador está esperando la siguiente ejecución programada...",
+    `📅 Verificación de canales cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
+  );
+  Logger.info(
+    "Cada canal se ejecuta según su propio cron_schedule configurado en BD",
   );
 
-  if (process.env.RUNN_CRON === "true") {
-    cron.schedule(CRON_SCHEDULE, async () => {
+  if (process.env.RUN_CRON === "true") {
+    cron.schedule(CRON_CHECK_INTERVAL, async () => {
       await runPipeline();
     });
   }

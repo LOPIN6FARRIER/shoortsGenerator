@@ -1,10 +1,9 @@
 import { Router } from "express";
+import { getVideosHandler, getVideoByIdHandler } from "./videos.handler.js";
 
 const router = Router();
 
-// TODO: Implement videos list and stats
-router.get("/", (req, res) => res.json({ message: "Videos list - TODO" }));
-router.get("/stats", (req, res) => res.json({ message: "Stats - TODO" }));
-router.get("/:id", (req, res) => res.json({ message: "Video detail - TODO" }));
+router.get("/", getVideosHandler);
+router.get("/:id", getVideoByIdHandler);
 
 export default router;

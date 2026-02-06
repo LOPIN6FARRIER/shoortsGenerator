@@ -5,6 +5,7 @@ export interface ControllerResult<T = any> {
   success: boolean;
   message: string;
   data?: T;
+  total?: number; // For paginated responses
   error?: string;
   statusCode?: number;
 }
@@ -13,12 +14,14 @@ export function createSuccessResult<T>(
   message: string,
   data?: T,
   statusCode = 200,
+  total?: number,
 ): ControllerResult<T> {
   return {
     success: true,
     message,
     statusCode,
     data,
+    ...(total !== undefined && { total }),
   };
 }
 

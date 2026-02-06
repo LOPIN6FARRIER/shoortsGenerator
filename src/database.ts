@@ -489,3 +489,112 @@ export async function checkDatabaseHealth(): Promise<boolean> {
     return false;
   }
 }
+
+// ============================================
+// CHANNELS & GROUPS
+// ============================================
+
+export interface ChannelConfig {
+  id: string;
+  language: string;
+  name: string;
+  voice: string;
+  voice_rate: string;
+  voice_pitch: string;
+  group_id: string | null;
+  group_name: string | null;
+  youtube_client_id: string;
+  youtube_client_secret: string;
+  youtube_redirect_uri: string;
+  youtube_access_token: string | null;
+  youtube_refresh_token: string | null;
+  youtube_token_expiry: number | null;
+  enabled: boolean;
+  cron_schedule: string;
+  subtitle_color: string;
+  subtitle_outline_color: string;
+  font_size: number;
+  max_chars_per_line: number;
+  video_width: number;
+  video_height: number;
+  video_fps: number;
+  video_max_duration: number;
+  use_pexels_videos: boolean;
+}
+
+/**
+ * Obtiene todos los canales activos con información de su grupo
+ */
+export async function getActiveChannels(): Promise<ChannelConfig[]> {
+  const db = getDatabase();
+  const result = await db.query<ChannelConfig>(
+    `SELECT 
+      c.*,
+      g.name as group_name
+    FROM channels c
+    LEFT JOIN channel_groups g ON c.group_id = g.id
+    WHERE c.enabled = true
+    ORDER BY c.group_id, c.language`,
+  );
+  return result.rows;
+}
+
+/**
+ * Obtiene canales de un grupo específico
+ */
+export async function getChannelsByGroup(
+  groupId: string,
+): Promise<ChannelConfig[]> {
+  const db = getDatabase();
+  const result = await db.query<ChannelConfig>(
+    `SELECT c.* FROM channels c WHERE c.group_id = $1 AND c.enabled = true`,
+    [groupId],
+  );
+  return result.rows;
+}
+
+/**
+ * Obtiene un canal por ID
+ */
+export async function getChannelById(
+  id: string,
+): Promise<ChannelConfig | null> {
+  const db = getDatabase();
+  const result = await db.query<ChannelConfig>(
+    `SELECT c.* FROM channels c WHERE c.id = $1`,
+    [id],
+  );
+  return result.rows[0] || null;
+}
+
+export interface PromptConfig {
+  id: string;
+  channel_id: string;
+  type: string;
+  name: string;
+  prompt_text: string;
+  enabled: boolean;
+}
+
+/**
+ * Obtiene prompts activos de un canal por tipo
+ */
+export async function getChannelPrompts(
+  channelId: string,
+  type?: string,
+): Promise<PromptConfig[]> {
+  const db = getDatabase();
+
+  let query = `SELECT * FROM prompts WHERE channel_id = $1 AND enabled = true`;
+  const params: any[] = [channelId];
+
+  if (type) {
+    query += ` AND type = $2`;
+    params.push(type);
+  }
+
+  query += ` ORDER BY created_at DESC`;
+
+  const result = await db.query<PromptConfig>(query, params);
+  return result.rows;
+}

@@ -26,7 +26,10 @@ function titleToKebabCase(title: string): string {
     .replace(/-+/g, "-");
 }
 
-export async function generateTopic(): Promise<Topic> {
+export async function generateTopic(
+  language: "es" | "en" = "es",
+  channelId?: string,
+): Promise<Topic> {
   // 🔍 MODO DEBUGGING: Intentar reutilizar último topic de BD
   if (process.env.DEBBUGING === "true") {
     Logger.info("🔍 DEBUGGING mode: Buscando último topic en BD...");
@@ -45,7 +48,8 @@ export async function generateTopic(): Promise<Topic> {
     );
   }
 
-  const prompt = `You are a creative researcher.
+  // Cargar prompt desde BD si se proporciona channelId
+  let prompt = `You are a creative researcher.
 Generate ONE original topic for a short micro-documentary.
 
 Rules:
@@ -64,6 +68,15 @@ Return ONLY valid JSON with:
   "imageKeywords": string (ONLY 2-3 simple keywords in English for Unsplash search. Examples: "library books", "laundry machine", "parking lot aerial", "coffee shop". NO commas, NO long phrases),
   "videoKeywords": string (ONLY 2-3 simple keywords in English for Pexels VIDEO search. Use action-related terms. Examples: "workers painting", "machines working", "people walking", "water flowing". NO commas, NO long phrases)
 }`;
+
+  if (channelId) {
+    const { getChannelPrompts } = await import("./database.js");
+    const prompts = await getChannelPrompts(channelId, "topic");
+    if (prompts.length > 0) {
+      prompt = prompts[0].prompt_text;
+      Logger.info(`📋 Usando prompt personalizado del canal`);
+    }
+  }
 
   try {
     Logger.info("Generando topic con IA...");

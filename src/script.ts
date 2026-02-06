@@ -268,6 +268,72 @@ Return ONLY the description in English, without quotes or additional formatting.
   }
 }
 
+/**
+ * Genera script usando un prompt personalizado desde BD
+ */
+export async function generateScriptWithPrompt(
+  topic: Topic,
+  language: "es" | "en",
+  customPrompt: string,
+): Promise<Script> {
+  Logger.info(`Generando script con prompt personalizado (${language})`);
+
+  const client = getOpenAIClient();
+
+  try {
+    // Reemplazar variables en el prompt
+    const prompt = customPrompt
+      .replace("${topic.title}", topic.title)
+      .replace("${topic.description}", topic.description);
+
+    const completion = await client.chat.completions.create({
+      model: CONFIG.openai.model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.8,
+      max_tokens: 800,
+    });
+
+    const response = completion.choices[0]?.message?.content?.trim();
+    if (!response) {
+      throw new Error("No se recibió respuesta de OpenAI");
+    }
+
+    // Parsear JSON
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Respuesta no contiene JSON válido");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const narrative = parsed.narrative || parsed.script || "";
+    const wordCount = narrative.split(/\s+/).length;
+    const estimatedDuration =
+      parsed.estimated_duration || Math.round(wordCount / 2.5);
+
+    const script: Script = {
+      language,
+      topic,
+      title: parsed.title || topic.title,
+      narrative,
+      description: parsed.description || topic.description,
+      tags: parsed.tags || ["shorts"],
+      estimatedDuration,
+      tokensUsed: completion.usage?.total_tokens || 0,
+    };
+
+    Logger.success(
+      `Script generado: ${wordCount} palabras, ~${estimatedDuration}s`,
+    );
+    return script;
+  } catch (error: any) {
+    Logger.error(
+      "Error generando script con prompt personalizado:",
+      error.message,
+    );
+    throw error;
+  }
+}
+
 export async function generateBilingualScripts(
   topic: Topic,
 ): Promise<{ es: Script; en: Script }> {
