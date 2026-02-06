@@ -60,7 +60,7 @@ Return ONLY valid JSON with:
   "id": string,
   "title": string,
   "description": string,
-  "imageKeywords": string (3-5 visual search keywords in English for finding relevant stock photos on Unsplash/Pexels. Examples: "parking lot aerial view", "coffee shop barista", "warehouse workers logistics")
+  "imageKeywords": string (ONLY 2-3 simple keywords in English for Unsplash search. Examples: "library books", "laundry machine", "parking lot aerial", "coffee shop". NO commas, NO long phrases)
 }`;
 
   try {

@@ -231,7 +231,11 @@ export async function executePipeline(): Promise<void> {
     let esScriptId = "";
     let enScriptId = "";
     if (dbHealthy) {
-      if (process.env.DEBBUGING === "true" && (scripts.es as any).id && (scripts.en as any).id) {
+      if (
+        process.env.DEBBUGING === "true" &&
+        (scripts.es as any).id &&
+        (scripts.en as any).id
+      ) {
         // En modo DEBUGGING, obtener el ID del script reutilizado (solo si existen)
         esScriptId = (scripts.es as any).id || "";
         enScriptId = (scripts.en as any).id || "";

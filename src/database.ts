@@ -216,7 +216,7 @@ export async function checkDuplicateTopic(title: string): Promise<boolean> {
 export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    "SELECT id, title, description, image_keywords as \"imageKeywords\", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT $1",
+    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT $1',
     [limit],
   );
   return result.rows;
@@ -225,7 +225,7 @@ export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
 export async function getLatestTopic(): Promise<Topic | null> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    "SELECT id, title, description, image_keywords as \"imageKeywords\", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT 1",
+    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT 1',
   );
   return result.rows[0] || null;
 }
@@ -233,7 +233,7 @@ export async function getLatestTopic(): Promise<Topic | null> {
 export async function getTopicById(topicId: string): Promise<Topic | null> {
   const db = getDatabase();
   const result = await db.query<Topic>(
-    "SELECT id, title, description, image_keywords as \"imageKeywords\", generated_at as timestamp FROM topics WHERE id = $1",
+    'SELECT id, title, description, image_keywords as "imageKeywords", generated_at as timestamp FROM topics WHERE id = $1',
     [topicId],
   );
   return result.rows[0] || null;

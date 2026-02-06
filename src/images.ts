@@ -168,11 +168,22 @@ async function saveImageReferences(
 
 /**
  * Extrae keywords relevantes del topic para búsqueda de imágenes
- * Usa las keywords generadas por OpenAI para mejor precisión
+ * Usa las keywords generadas por OpenAI y las simplifica si son muy largas
  */
 function extractImageKeywords(topic: Topic): string {
-  // Usar las keywords generadas por OpenAI (siempre en inglés y optimizadas)
-  const keywords = topic.imageKeywords || topic.title;
+  let keywords = topic.imageKeywords || topic.title;
+
+  // Si las keywords tienen comas, tomar solo la primera parte
+  if (keywords.includes(",")) {
+    keywords = keywords.split(",")[0].trim();
+  }
+
+  // Limitar a máximo 3 palabras para búsquedas más efectivas
+  const words = keywords.split(/\s+/);
+  if (words.length > 3) {
+    keywords = words.slice(0, 3).join(" ");
+  }
+
   Logger.info(`🔍 Usando keywords de IA para búsqueda: "${keywords}"`);
   return keywords;
 }
