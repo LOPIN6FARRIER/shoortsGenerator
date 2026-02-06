@@ -49,12 +49,12 @@ export async function downloadTopicImages(
         const filename = img.file_path.split(/[\\/]/).pop() || "";
         const absolutePath = join(outputDir, filename);
         const exists = existsSync(absolutePath);
-        
+
         if (exists) {
           // Actualizar con la ruta absoluta actual
           img.file_path = absolutePath;
         }
-        
+
         return exists;
       });
 

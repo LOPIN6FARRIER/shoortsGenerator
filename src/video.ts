@@ -109,8 +109,10 @@ export async function generateVideo(
       `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
       `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
       `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
-      `Alignment=2`, // Centrado inferior
-      `MarginV=50`, // Margen inferior mínimo para máxima visibilidad
+      `Alignment=2`,     // Centrado inferior
+      `MarginV=50`,      // Margen inferior mínimo
+      `MarginL=40`,      // Margen izquierdo para evitar cortes
+      `MarginR=40`,      // Margen derecho para evitar cortes
     ].join(",");
 
     filterComplex =
