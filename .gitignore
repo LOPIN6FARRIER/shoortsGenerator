@@ -9,6 +9,7 @@ assets/images/
 *.mp4
 *.srt
 credentials-*.json
+google.json
 
 # Database schemas and migrations (contain credentials/sensitive data)
 database/schema.sql
