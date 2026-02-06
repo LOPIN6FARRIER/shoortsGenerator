@@ -31,7 +31,7 @@ export async function generateTopic(
   channelId?: string,
 ): Promise<Topic> {
   // 🔍 MODO DEBUGGING: Intentar reutilizar último topic de BD
-  if (process.env.DEBBUGING === "true") {
+  if (process.env.DEBUGGING === "true") {
     Logger.info("🔍 DEBUGGING mode: Buscando último topic en BD...");
     let topic = await getLatestTopic();
     if (topic) {

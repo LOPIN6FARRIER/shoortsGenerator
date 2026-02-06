@@ -239,8 +239,8 @@ async function processChannelGroup(
       subtitles_file_path: srtPath,
     });
 
-    // Upload a YouTube (si está autenticado)
-    if (channel.youtube_access_token && process.env.DEBBUGING !== "true") {
+    // Upload a YouTube (si está autenticado y no está en modo DEBUG)
+    if (channel.youtube_access_token && process.env.DEBUGGING !== "true") {
       Logger.info("Subiendo a YouTube...");
 
       // Convertir ChannelConfig de BD a formato esperado por uploadToYouTube
@@ -252,10 +252,20 @@ async function processChannelGroup(
         youtubeCredentialsPath: "", // No usado cuando pasamos tokens directamente
       } as any;
 
+      // Tokens desde BD
+      const tokens = {
+        access_token: channel.youtube_access_token,
+        refresh_token: channel.youtube_refresh_token || undefined,
+        expiry_date: channel.youtube_token_expiry || undefined,
+        token_type: channel.youtube_token_type || "Bearer",
+        scope: channel.youtube_scope || undefined,
+      };
+
       const uploadResult = await uploadToYouTube(
         videoResult.videoPath,
         script,
         legacyChannelConfig,
+        tokens,
       );
 
       await saveYouTubeUpload({
@@ -277,6 +287,13 @@ async function processChannelGroup(
 
       Logger.success(`✅ ${channel.name}: ${uploadResult.url}`);
     } else {
+      // Modo DEBUGGING o canal sin autenticación
+      if (process.env.DEBUGGING === "true") {
+        Logger.warn(
+          `⚠️  MODO DEBUGGING: Saltando upload a YouTube. Video disponible en: ${videoResult.videoPath}`,
+        );
+      }
+
       results.push({
         channelName: channel.name,
         language: channel.language,

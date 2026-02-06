@@ -340,7 +340,7 @@ export async function generateBilingualScripts(
   Logger.info("Generando scripts bilingües con IA...");
 
   // 🔍 MODO DEBUGGING: Intentar reutilizar últimos scripts de BD por idioma
-  if (process.env.DEBBUGING === "true") {
+  if (process.env.DEBUGGING === "true") {
     Logger.info("🔍 DEBUGGING mode: Buscando últimos scripts en BD...");
 
     const [latestScriptES, latestScriptEN] = await Promise.all([

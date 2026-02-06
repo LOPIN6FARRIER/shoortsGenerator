@@ -509,6 +509,8 @@ export interface ChannelConfig {
   youtube_access_token: string | null;
   youtube_refresh_token: string | null;
   youtube_token_expiry: number | null;
+  youtube_token_type: string | null;
+  youtube_scope: string | null;
   enabled: boolean;
   cron_schedule: string;
   subtitle_color: string;

@@ -19,6 +19,13 @@ export async function uploadToYouTube(
   videoPath: string,
   script: Script,
   channelConfig: ChannelConfig,
+  tokens?: {
+    access_token?: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    token_type?: string;
+    scope?: string;
+  },
 ): Promise<UploadResult> {
   Logger.info(
     `Subiendo video a YouTube (${channelConfig.language}): ${script.title}`,
@@ -32,18 +39,23 @@ export async function uploadToYouTube(
       channelConfig.youtubeRedirectUri,
     );
 
-    // Cargar credenciales guardadas
-    if (!existsSync(channelConfig.youtubeCredentialsPath)) {
-      throw new Error(
-        `Credenciales no encontradas en: ${channelConfig.youtubeCredentialsPath}\n` +
-          "Ejecuta el flujo de autenticación primero con: npm run auth",
-      );
-    }
+    // Si se pasaron tokens directamente (desde BD), usarlos
+    if (tokens && tokens.access_token) {
+      oauth2Client.setCredentials(tokens);
+    } else {
+      // Cargar credenciales desde archivo (flujo legacy)
+      if (!existsSync(channelConfig.youtubeCredentialsPath)) {
+        throw new Error(
+          `Credenciales no encontradas en: ${channelConfig.youtubeCredentialsPath}\n` +
+            "Ejecuta el flujo de autenticación primero con: npm run auth",
+        );
+      }
 
-    const credentials = JSON.parse(
-      readFileSync(channelConfig.youtubeCredentialsPath, "utf-8"),
-    );
-    oauth2Client.setCredentials(credentials);
+      const credentials = JSON.parse(
+        readFileSync(channelConfig.youtubeCredentialsPath, "utf-8"),
+      );
+      oauth2Client.setCredentials(credentials);
+    }
 
     // Preparar metadata del video
     const videoMetadata = {
