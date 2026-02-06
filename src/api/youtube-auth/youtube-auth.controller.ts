@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { getPool } from "../../database.js";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { Logger } from "../../utils.js";
 import {
   createSuccessResult,
   createErrorResult,
@@ -190,32 +191,43 @@ export async function handleManualOAuthCode(
   code: string,
 ): Promise<ControllerResult<{ success: boolean }>> {
   try {
+    Logger.info(`[OAuth] Processing manual code for channel: ${channelId}`);
+    Logger.info(`[OAuth] Code length: ${code?.length || 0} characters`);
+
     const pool = getPool();
 
     // Obtener configuración del canal
     const channelResult = await pool.query(
-      `SELECT id, youtube_client_id, youtube_client_secret, youtube_redirect_uri
+      `SELECT id, name, youtube_client_id, youtube_client_secret, youtube_redirect_uri
        FROM channels WHERE id = $1`,
       [channelId],
     );
 
     if (channelResult.rows.length === 0) {
+      Logger.error(`[OAuth] Channel not found: ${channelId}`);
       return createErrorResult("Channel not found", undefined, 404);
     }
 
     const channel = channelResult.rows[0];
+    Logger.info(`[OAuth] Channel found: ${channel.name}`);
 
     if (
       !channel.youtube_client_id ||
       !channel.youtube_client_secret ||
       !channel.youtube_redirect_uri
     ) {
+      Logger.error(`[OAuth] Incomplete OAuth config for channel: ${channel.name}`);
+      Logger.error(
+        `[OAuth] Has client_id: ${!!channel.youtube_client_id}, client_secret: ${!!channel.youtube_client_secret}, redirect_uri: ${!!channel.youtube_redirect_uri}`,
+      );
       return createErrorResult(
         "Channel OAuth configuration incomplete",
         undefined,
         400,
       );
     }
+
+    Logger.info(`[OAuth] OAuth config valid, exchanging code for tokens...`);
 
     // Crear cliente OAuth2
     const oauth2Client = new google.auth.OAuth2(
@@ -255,6 +267,9 @@ export async function handleManualOAuthCode(
       success: true,
     });
   } catch (error: any) {
+    Logger.error(`[OAuth] Error processing code:`, error);
+    Logger.error(`[OAuth] Error message: ${error.message}`);
+    Logger.error(`[OAuth] Error details:`, JSON.stringify(error, null, 2));
     return createErrorResult(
       "Failed to process OAuth code",
       error.message,

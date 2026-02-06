@@ -157,9 +157,7 @@ export async function executePipelineFromDB(
 
         await processChannelGroup(groupChannels, executionId);
       } catch (error: any) {
-        Logger.error(
-          `❌ Error procesando grupo ${groupId}: ${error.message}`,
-        );
+        Logger.error(`❌ Error procesando grupo ${groupId}: ${error.message}`);
         await logError({
           execution_id: executionId,
           error_type: "channel_group_failed",
