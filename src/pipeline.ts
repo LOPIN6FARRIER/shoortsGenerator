@@ -58,11 +58,14 @@ async function processChannel(
 
   // Subtítulos
   Logger.info("Generando subtítulos...");
-  const srtPath = generateShortsOptimizedSRT(
+  const subtitlesStart = Date.now();
+  const srtPath = await generateShortsOptimizedSRT(
     script,
-    ttsResult.duration,
+    ttsResult.audioPath,
     outputDir,
   );
+  const subtitlesDuration = Math.round((Date.now() - subtitlesStart) / 1000);
+  Logger.success(`Subtítulos generados (${subtitlesDuration}s)`);
 
   // Video
   Logger.info("Generando video vertical (9:16)...");
@@ -363,9 +366,9 @@ async function processChannelLegacy(
   const startTime = Date.now();
 
   const ttsResult = await generateTTS(script, outputDir);
-  const srtPath = generateShortsOptimizedSRT(
+  const srtPath = await generateShortsOptimizedSRT(
     script,
-    ttsResult.duration,
+    ttsResult.audioPath,
     outputDir,
   );
   const videoResult = await generateVideo(
