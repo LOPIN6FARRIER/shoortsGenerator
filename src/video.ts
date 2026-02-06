@@ -49,7 +49,8 @@ export async function generateVideo(
 
   // Intentar descargar imágenes del topic
   Logger.info("Descargando imágenes del topic...");
-  const imagePaths = await downloadTopicImages(script.topic, outputDir, 4);
+  // 💾 Usar carpeta persistente para imágenes (no cambia entre ejecuciones)
+  const imagePaths = await downloadTopicImages(script.topic, CONFIG.paths.images, 4);
   Logger.info(`📷 Imágenes obtenidas: ${imagePaths.length}`);
 
   let backgroundInput: string;
@@ -112,8 +113,8 @@ export async function generateVideo(
       `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
       `Alignment=2`, // Centrado inferior
       `MarginV=50`, // Margen inferior mínimo
-      `MarginL=40`, // Margen izquierdo para evitar cortes
-      `MarginR=40`, // Margen derecho para evitar cortes
+      `MarginL=80`, // Margen izquierdo amplio para no salirse de pantalla
+      `MarginR=80`, // Margen derecho amplio para no salirse de pantalla
     ].join(",");
 
     filterComplex =

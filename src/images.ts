@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { pipeline } from "stream/promises";
 import { Logger } from "./utils.js";
@@ -25,6 +25,12 @@ export async function downloadTopicImages(
   count: number = 4,
 ): Promise<string[]> {
   try {
+    // 🗂️ Crear directorio de imágenes si no existe
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+      Logger.info(`📁 Carpeta de imágenes creada: ${outputDir}`);
+    }
+
     // Validar que topic existe y tiene las propiedades necesarias
     if (!topic || !topic.title) {
       Logger.warn(

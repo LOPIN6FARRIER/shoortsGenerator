@@ -36,11 +36,12 @@ export function generateShortsOptimizedSRT(
   const words = script.narrative.split(/\s+/);
   const segments: SubtitleSegment[] = [];
 
-  // Calcular palabras por segmento basado en wordsPerSecond
+  // Calcular palabras por segmento basado en capacidad de caracteres
   const totalWords = words.length;
-  const wordsPerSegment = Math.ceil(
-    channelConfig.subtitles.wordsPerSecond * 2.0,
-  ); // 2.0s por segmento para mejor sincronización
+  // 💡 Calcular basado en capacidad real: 2 líneas * maxChars / promedio chars por palabra
+  const avgCharsPerWord = language === "es" ? 5.5 : 4.7;
+  const maxCharsTotal = channelConfig.subtitles.maxLines * channelConfig.subtitles.maxCharsPerLine;
+  const wordsPerSegment = Math.floor(maxCharsTotal / avgCharsPerWord); // ~5-6 palabras
   const totalSegments = Math.ceil(totalWords / wordsPerSegment);
 
   // Ajustar timing para que coincida con la duración real del audio

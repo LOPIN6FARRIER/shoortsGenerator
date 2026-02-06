@@ -67,5 +67,6 @@ export const CONFIG = {
     output: join(process.cwd(), "output"),
     outputEs: join(process.cwd(), "output", "es"),
     outputEn: join(process.cwd(), "output", "en"),
+    images: join(process.cwd(), "public", "images"), // Carpeta persistente para imágenes reutilizables
   },
 };
