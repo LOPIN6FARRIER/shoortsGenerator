@@ -40,7 +40,8 @@ export function generateShortsOptimizedSRT(
   const totalWords = words.length;
   // 💡 Calcular basado en capacidad real: 2 líneas * maxChars / promedio chars por palabra
   const avgCharsPerWord = language === "es" ? 5.5 : 4.7;
-  const maxCharsTotal = channelConfig.subtitles.maxLines * channelConfig.subtitles.maxCharsPerLine;
+  const maxCharsTotal =
+    channelConfig.subtitles.maxLines * channelConfig.subtitles.maxCharsPerLine;
   const wordsPerSegment = Math.floor(maxCharsTotal / avgCharsPerWord); // ~5-6 palabras
   const totalSegments = Math.ceil(totalWords / wordsPerSegment);
 

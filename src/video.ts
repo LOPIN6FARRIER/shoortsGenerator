@@ -50,7 +50,11 @@ export async function generateVideo(
   // Intentar descargar imágenes del topic
   Logger.info("Descargando imágenes del topic...");
   // 💾 Usar carpeta persistente para imágenes (no cambia entre ejecuciones)
-  const imagePaths = await downloadTopicImages(script.topic, CONFIG.paths.images, 4);
+  const imagePaths = await downloadTopicImages(
+    script.topic,
+    CONFIG.paths.images,
+    4,
+  );
   Logger.info(`📷 Imágenes obtenidas: ${imagePaths.length}`);
 
   let backgroundInput: string;
