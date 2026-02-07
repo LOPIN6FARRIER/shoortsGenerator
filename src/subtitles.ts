@@ -24,7 +24,10 @@ let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI {
   if (!CONFIG.openai.apiKey) {
-    throw new Error("OPENAI_API_KEY no configurada en .env");
+    throw new Error(
+      "⚠️  OPENAI_API_KEY no configurada. Whisper API requiere OpenAI.\n" +
+      "   💡 Alternativa: Instalar whisper.cpp localmente para transcripción sin API."
+    );
   }
 
   if (!openaiClient) {

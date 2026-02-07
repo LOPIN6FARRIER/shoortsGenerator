@@ -22,6 +22,12 @@ export const CONFIG = {
     model: process.env.OPENAI_MODEL || "gpt-4",
   },
 
+  ollama: {
+    enabled: process.env.OLLAMA_ENABLED !== "false", // Habilitado por defecto
+    baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
+    model: process.env.OLLAMA_MODEL || "llama3.1:8b", // Recomendado: balance calidad/RAM
+  },
+
   channels: {
     es: {
       language: "es",

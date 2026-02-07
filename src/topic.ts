@@ -1,7 +1,7 @@
-import OpenAI from "openai";
 import { CONFIG } from "./config.js";
 import { Logger } from "./utils.js";
 import { getLatestTopic } from "./database.js";
+import { getLLMClient, getModel } from "./llm.js";
 
 export interface Topic {
   id: string;
@@ -12,10 +12,6 @@ export interface Topic {
   timestamp: string;
   tokensUsed?: number;
 }
-
-const openai = new OpenAI({
-  apiKey: CONFIG.openai.apiKey,
-});
 
 function titleToKebabCase(title: string): string {
   return title
@@ -60,7 +56,9 @@ Rules:
 - Avoid clickbait.
 - Calm, curious, thoughtful tone.
 
-Return ONLY valid JSON with:
+CRITICAL: Return ONLY valid JSON, nothing else. No explanations, no markdown, no extra text.
+
+JSON format:
 {
   "id": string,
   "title": string,
@@ -81,8 +79,16 @@ Return ONLY valid JSON with:
   try {
     Logger.info("Generando topic con IA...");
 
-    const response = await openai.chat.completions.create({
-      model: CONFIG.openai.model,
+    const provider = await getLLMClient();
+    const client = provider.client;
+    const model = getModel(provider);
+
+    // 🎛️ Ajustar temperatura según provider
+    // Ollama necesita temperatura más baja para seguir instrucciones JSON
+    const temperature = provider.name === "ollama" ? 0.7 : 0.9;
+
+    const response = await client.chat.completions.create({
+      model: model,
       messages: [
         {
           role: "system",
@@ -94,7 +100,7 @@ Return ONLY valid JSON with:
           content: prompt,
         },
       ],
-      temperature: 0.9,
+      temperature: temperature,
       response_format: { type: "json_object" },
     });
 
@@ -103,7 +109,21 @@ Return ONLY valid JSON with:
       throw new Error("La IA no devolvió contenido");
     }
 
-    const parsed = JSON.parse(content);
+    // 🔧 PARSING ROBUSTO: Ollama puede devolver texto extra antes/después del JSON
+    let parsed;
+    try {
+      // Intentar parsear directo primero
+      parsed = JSON.parse(content);
+    } catch {
+      // Si falla, buscar JSON dentro del texto
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        Logger.error("❌ Respuesta no contiene JSON válido:");
+        Logger.error(content.substring(0, 500));
+        throw new Error("Respuesta no contiene JSON válido");
+      }
+      parsed = JSON.parse(jsonMatch[0]);
+    }
 
     if (!parsed.title || !parsed.description) {
       throw new Error("La respuesta de la IA no contiene title o description");

@@ -1,9 +1,9 @@
-import OpenAI from "openai";
 import { Topic } from "./topic.js";
 import { Logger } from "./utils.js";
 import { CONFIG } from "./config.js";
 import { getLattestScript, getLatestScriptByLanguage } from "./database.js";
 import { getChannelConfig } from "./channels.config.js";
+import { getLLMClient, getModel } from "./llm.js";
 
 export interface Script {
   language: string;
@@ -16,27 +16,15 @@ export interface Script {
   tokensUsed?: number;
 }
 
-let openaiClient: OpenAI | null = null;
-
-function getOpenAIClient(): OpenAI {
-  if (!CONFIG.openai.apiKey) {
-    throw new Error("OPENAI_API_KEY no configurada en .env");
-  }
-
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: CONFIG.openai.apiKey });
-  }
-
-  return openaiClient;
-}
-
 export async function generateScript(
   topic: Topic,
   language: "es" | "en",
 ): Promise<Script> {
   Logger.info(`Generando guion con IA para: ${topic.id} (${language})`);
 
-  const client = getOpenAIClient();
+  const provider = await getLLMClient();
+  const client = provider.client;
+  const model = getModel(provider);
   const channelConfig = getChannelConfig(language);
   const languageName =
     language === "es" ? "español (Spanish)" : "inglés (English)";
@@ -107,7 +95,7 @@ Devuelve SOLO el texto narrativo en ${languageName}, sin formato adicional.`;
 
   try {
     const completion = await client.chat.completions.create({
-      model: CONFIG.openai.model,
+      model: model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8, // Mayor creatividad para hooks virales
       max_tokens: 450,
@@ -182,7 +170,7 @@ Good examples:
 Return ONLY the title in English, without quotes or additional formatting.`;
 
     const titleCompletion = await client.chat.completions.create({
-      model: CONFIG.openai.model,
+      model: model,
       messages: [{ role: "user", content: titlePrompt }],
       temperature: 0.9, // Alta creatividad para títulos virales
       max_tokens: 40,
@@ -228,7 +216,7 @@ REQUIREMENTS:
 Return ONLY the description in English, without quotes or additional formatting.`;
 
     const descriptionCompletion = await client.chat.completions.create({
-      model: CONFIG.openai.model,
+      model: model,
       messages: [{ role: "user", content: descriptionPrompt }],
       temperature: 0.8,
       max_tokens: 80,
@@ -278,7 +266,9 @@ export async function generateScriptWithPrompt(
 ): Promise<Script> {
   Logger.info(`Generando script con prompt personalizado (${language})`);
 
-  const client = getOpenAIClient();
+  const provider = await getLLMClient();
+  const client = provider.client;
+  const model = getModel(provider);
 
   try {
     // Reemplazar variables en el prompt
@@ -287,7 +277,7 @@ export async function generateScriptWithPrompt(
       .replace("${topic.description}", topic.description);
 
     const completion = await client.chat.completions.create({
-      model: CONFIG.openai.model,
+      model: model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8,
       max_tokens: 4000, // Aumentado para soportar 1500-2000 palabras + JSON
