@@ -526,6 +526,7 @@ export interface ChannelConfig {
   video_fps: number;
   video_max_duration: number;
   use_pexels_videos: boolean;
+  upload_as_short: boolean;
 }
 
 /**

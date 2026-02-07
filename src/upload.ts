@@ -26,9 +26,11 @@ export async function uploadToYouTube(
     token_type?: string;
     scope?: string;
   },
+  uploadAsShort: boolean = true,
 ): Promise<UploadResult> {
+  const videoType = uploadAsShort ? "Short" : "video";
   Logger.info(
-    `Subiendo video a YouTube (${channelConfig.language}): ${script.title}`,
+    `Subiendo ${videoType} a YouTube (${channelConfig.language}): ${script.title}`,
   );
 
   try {
@@ -58,10 +60,14 @@ export async function uploadToYouTube(
     }
 
     // Preparar metadata del video
+    const description = uploadAsShort 
+      ? script.description + "\n\n#Shorts"
+      : script.description;
+
     const videoMetadata = {
       snippet: {
         title: script.title,
-        description: script.description + "\n\n#Shorts",
+        description: description,
         tags: script.tags,
         categoryId: "27", // Education
         defaultLanguage: script.language,
@@ -83,7 +89,9 @@ export async function uploadToYouTube(
     });
 
     const videoId = response.data.id!;
-    const videoUrl = `https://www.youtube.com/shorts/${videoId}`;
+    const videoUrl = uploadAsShort
+      ? `https://www.youtube.com/shorts/${videoId}`
+      : `https://www.youtube.com/watch?v=${videoId}`;
 
     Logger.success(`Video subido exitosamente: ${videoUrl}`);
 

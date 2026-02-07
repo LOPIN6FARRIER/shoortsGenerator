@@ -290,7 +290,7 @@ export async function generateScriptWithPrompt(
       model: CONFIG.openai.model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8,
-      max_tokens: 800,
+      max_tokens: 4000, // Aumentado para soportar 1500-2000 palabras + JSON
     });
 
     const response = completion.choices[0]?.message?.content?.trim();
@@ -298,13 +298,23 @@ export async function generateScriptWithPrompt(
       throw new Error("No se recibió respuesta de OpenAI");
     }
 
-    // Parsear JSON
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    // Parsear JSON - Maneja bloques markdown y JSON plano
+    let jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
     if (!jsonMatch) {
+      jsonMatch = response.match(/```\s*([\s\S]*?)\s*```/);
+    }
+    if (!jsonMatch) {
+      jsonMatch = response.match(/\{[\s\S]*\}/);
+    }
+    
+    if (!jsonMatch) {
+      Logger.error("❌ Respuesta de OpenAI no contiene JSON:");
+      Logger.error(response.substring(0, 500)); // Mostrar primeros 500 chars
       throw new Error("Respuesta no contiene JSON válido");
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const jsonString = jsonMatch[1] || jsonMatch[0];
+    const parsed = JSON.parse(jsonString);
     const narrative = parsed.narrative || parsed.script || "";
     const wordCount = narrative.split(/\s+/).length;
     const estimatedDuration =

@@ -22,6 +22,7 @@ export async function downloadPexelsVideos(
   topic: Topic,
   outputDir: string,
   count: number = 3,
+  orientation: 'portrait' | 'landscape' = 'portrait',
 ): Promise<string[]> {
   try {
     if (!CONFIG.pexels.apiKey) {
@@ -41,7 +42,7 @@ export async function downloadPexelsVideos(
     Logger.info(`🔍 Keywords: "${keywords}"`);
 
     // Buscar videos en Pexels
-    const videos = await searchPexelsVideos(keywords, count);
+    const videos = await searchPexelsVideos(keywords, count, orientation);
 
     if (videos.length === 0) {
       Logger.warn("No se encontraron videos en Pexels");
@@ -94,10 +95,11 @@ function extractVideoKeywords(topic: Topic): string {
 async function searchPexelsVideos(
   query: string,
   count: number,
+  orientation: 'portrait' | 'landscape' = 'portrait',
 ): Promise<VideoSource[]> {
   try {
     const response = await fetch(
-      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=${count}&orientation=portrait`,
+      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=${count}&orientation=${orientation}`,
       {
         headers: {
           Authorization: CONFIG.pexels.apiKey,
@@ -112,13 +114,14 @@ async function searchPexelsVideos(
     const data = (await response.json()) as any;
 
     return data.videos.map((video: any) => {
-      // Encontrar el archivo de video más apropiado (HD vertical)
+      // Encontrar el archivo de video más apropiado según orientación
+      const isPortrait = orientation === 'portrait';
       const videoFile =
         video.video_files.find(
           (file: any) =>
             file.quality === "hd" &&
-            file.width < file.height && // Vertical
-            file.width >= 720,
+            (isPortrait ? file.width < file.height : file.width > file.height) &&
+            (isPortrait ? file.width >= 720 : file.width >= 1280),
         ) || video.video_files[0]; // Fallback al primero
 
       return {

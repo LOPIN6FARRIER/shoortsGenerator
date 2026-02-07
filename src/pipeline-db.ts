@@ -310,6 +310,11 @@ async function processChannelGroup(
       ttsResult.audioPath,
       srtPath,
       outputDir,
+      {
+        width: channel.video_width,
+        height: channel.video_height,
+        fps: channel.video_fps,
+      },
     );
 
     // Guardar video en BD
@@ -359,6 +364,7 @@ async function processChannelGroup(
           script,
           legacyChannelConfig,
           tokens,
+          channel.upload_as_short,
         );
 
         await saveYouTubeUpload({

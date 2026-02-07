@@ -35,10 +35,11 @@ export async function generateVideo(
   audioPath: string,
   srtPath: string,
   outputDir: string,
+  dimensions?: { width: number; height: number; fps: number },
 ): Promise<VideoResult> {
   Logger.info(`Generando video para: ${script.title}`);
 
-  const { width, height, fps } = CONFIG.video;
+  const { width, height, fps } = dimensions || CONFIG.video;
   const language = script.language as "es" | "en";
   const channelConfig = getChannelConfig(language);
   const outputVideoPath = join(outputDir, "final.mp4");
@@ -54,10 +55,13 @@ export async function generateVideo(
 
   if (CONFIG.video.useVideos && CONFIG.pexels.apiKey) {
     Logger.info("Descargando videos de Pexels...");
+    const orientation = height > width ? 'portrait' : 'landscape';
+    Logger.info(`📐 Orientación: ${orientation} (${width}x${height})`);
     mediaPaths = await downloadPexelsVideos(
       script.topic,
       CONFIG.paths.images,
       3,
+      orientation,
     );
     if (mediaPaths.length > 0) {
       isVideoMode = true;
@@ -173,6 +177,7 @@ export async function generateVideo(
         srtPath,
         outputDir,
         duration,
+        { width, height, fps },
       );
     }
   } else if (imagePaths.length >= 1 && isVideoMode) {
@@ -336,6 +341,7 @@ export async function generateVideo(
         srtPath,
         outputDir,
         duration,
+        { width, height, fps },
       );
     }
   } else {
@@ -347,6 +353,7 @@ export async function generateVideo(
       srtPath,
       outputDir,
       duration,
+      { width, height, fps },
     );
   }
 
@@ -367,8 +374,9 @@ async function generateVideoWithGradient(
   srtPath: string,
   outputDir: string,
   duration: number,
+  dimensions?: { width: number; height: number; fps: number },
 ): Promise<VideoResult> {
-  const { width, height, fps } = CONFIG.video;
+  const { width, height, fps } = dimensions || CONFIG.video;
   const outputVideoPath = join(outputDir, "final.mp4");
   const backgroundPath = join(outputDir, "background.png");
 
