@@ -279,18 +279,35 @@ export async function generateScriptWithPrompt(
     // Agregar instrucciones adicionales para JSON limpio (especialmente para Ollama)
     const enhancedPrompt = `${prompt}
 
-CRITICAL INSTRUCTIONS:
-1. Return ONLY valid JSON, nothing else before or after
-2. NO line breaks inside string values - use spaces instead
-3. Follow EXACTLY the JSON format specified in the prompt
-4. All field names must match exactly as requested
-5. No explanations, no markdown, no extra text`;
+─────────────────────────────────────────
+⚠️ CRITICAL JSON FORMAT INSTRUCTIONS ⚠️
+─────────────────────────────────────────
+
+1. Return ONLY valid JSON - nothing before, nothing after
+2. NO line breaks inside string values (use spaces or \\n escape sequence)
+3. All strings must be on a SINGLE LINE
+4. Use double quotes for strings, NO single quotes
+5. No trailing commas in objects or arrays
+6. All field names must match exactly as specified
+7. Do NOT wrap in markdown code blocks like \`\`\`json
+8. Do NOT add explanations or comments
+
+VALID EXAMPLE:
+{"title": "Short title", "narrative": "This is a long text that stays on one line even if it's very long", "description": "Description here"}
+
+INVALID EXAMPLE (DO NOT DO THIS):
+{
+  "narrative": "This text breaks
+  into multiple lines"
+}
+
+Return the JSON NOW:`;
 
     const completion = await client.chat.completions.create({
       model: model,
       messages: [{ role: "user", content: enhancedPrompt }],
-      temperature: 0.8,
-      max_tokens: 4000,
+      temperature: 0.7, // Reducir temperatura para mayor consistencia
+      max_tokens: 7000,
     });
 
     const response = completion.choices[0]?.message?.content?.trim();
@@ -316,22 +333,46 @@ CRITICAL INSTRUCTIONS:
     // Limpiar caracteres de control del JSON
     let jsonString = jsonMatch[1] || jsonMatch[0];
 
-    // 🔧 LIMPIEZA: Remover caracteres de control inválidos para JSON
-    // Preservar \n, \r, \t válidos pero eliminar otros caracteres de control
+    // 🔧 LIMPIEZA AGRESIVA: Normalizar saltos de línea dentro de strings
     jsonString = jsonString
-      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, "") // Remover caracteres de control excepto \t, \n, \r
-      .replace(/\n/g, "\\n") // Escapar saltos de línea dentro de strings
-      .replace(/\r/g, "\\r") // Escapar retornos de carro
-      .replace(/\t/g, "\\t"); // Escapar tabs
+      .trim()
+      // Remover caracteres de control problemáticos
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      // Normalizar saltos de línea: convertir \r\n a \n
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n");
 
     let parsed;
     try {
       parsed = JSON.parse(jsonString);
     } catch (parseError: any) {
-      Logger.error("❌ Error parseando JSON:");
-      Logger.error("JSON problemático (primeros 500 chars):");
-      Logger.error(jsonString.substring(0, 500));
-      throw new Error(`JSON inválido: ${parseError.message}`);
+      // Segundo intento: escapar saltos de línea dentro de strings
+      Logger.warn(
+        "⚠️ Primer intento falló, limpiando saltos de línea en strings...",
+      );
+      try {
+        // Estrategia: reemplazar saltos de línea dentro de valores de string por espacios
+        const cleanedJson = jsonString.replace(
+          /"([^"\\]*(?:\\.[^"\\]*)*)"/g,
+          (match, content) => {
+            // Dentro de cada string, reemplazar saltos de línea por espacios
+            const cleaned = content
+              .replace(/\n/g, " ") // \n → espacio
+              .replace(/\s+/g, " ") // múltiples espacios → uno
+              .trim();
+            return `"${cleaned}"`;
+          },
+        );
+        parsed = JSON.parse(cleanedJson);
+        Logger.success("✅ JSON parseado exitosamente después de limpieza");
+      } catch (secondError: any) {
+        Logger.error("❌ Error parseando JSON después de limpieza:");
+        Logger.error("JSON problemático (primeros 1000 chars):");
+        Logger.error(jsonString.substring(0, 1000));
+        Logger.error(`\nError original: ${parseError.message}`);
+        Logger.error(`Error después de limpieza: ${secondError.message}`);
+        throw new Error(`JSON inválido: ${parseError.message}`);
+      }
     }
     const narrative = parsed.narrative || parsed.script || "";
     const wordCount = narrative.split(/\s+/).length;
