@@ -296,7 +296,7 @@ export async function generateScriptWithPrompt(
     if (!jsonMatch) {
       jsonMatch = response.match(/\{[\s\S]*\}/);
     }
-    
+
     if (!jsonMatch) {
       Logger.error("❌ Respuesta de OpenAI no contiene JSON:");
       Logger.error(response.substring(0, 500)); // Mostrar primeros 500 chars
