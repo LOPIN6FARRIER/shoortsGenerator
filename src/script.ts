@@ -271,10 +271,17 @@ export async function generateScriptWithPrompt(
   const model = getModel(provider);
 
   try {
-    // Reemplazar variables en el prompt
+    // Reemplazar variables en el prompt (todas las ocurrencias)
+    Logger.info(`\n📋 GENERANDO SCRIPT PARA TOPIC:`);
+    Logger.info(`   Title: "${topic.title}"`);
+    Logger.info(`   Description: "${topic.description.substring(0, 150)}..."`);
+    
     const prompt = customPrompt
-      .replace("${topic.title}", topic.title)
-      .replace("${topic.description}", topic.description);
+      .replace(/\$\{topic\.title\}/g, topic.title)
+      .replace(/\$\{topic\.description\}/g, topic.description);
+
+    Logger.info(`\n📝 PROMPT DESPUÉS DE REEMPLAZAR VARIABLES:`);
+    Logger.info(prompt.substring(0, 500) + "...\n");
 
     // Agregar instrucciones adicionales para JSON limpio (especialmente para Ollama)
     const enhancedPrompt = `${prompt}
@@ -391,8 +398,9 @@ Return the JSON NOW:`;
     };
 
     Logger.success(
-      `Script generado: ${wordCount} palabras, ~${estimatedDuration}s`,
+      `Script generado: "${script.title}" - ${wordCount} palabras, ~${estimatedDuration}s`,
     );
+    Logger.info(`📝 Narrative preview: "${narrative.substring(0, 150)}..."`);
     return script;
   } catch (error: any) {
     Logger.error(
