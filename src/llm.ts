@@ -20,7 +20,7 @@ async function isOllamaAvailable(): Promise<boolean> {
     const timeoutId = setTimeout(() => controller.abort(), 2000); // Timeout 2s
 
     // Quitar /v1 del baseUrl para verificación (Ollama API base)
-    const baseUrl = CONFIG.ollama.baseUrl.replace(/\/v1\/?$/, '');
+    const baseUrl = CONFIG.ollama.baseUrl.replace(/\/v1\/?$/, "");
     const response = await fetch(`${baseUrl}/api/tags`, {
       signal: controller.signal,
     });

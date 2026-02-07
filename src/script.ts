@@ -276,16 +276,26 @@ export async function generateScriptWithPrompt(
       .replace("${topic.title}", topic.title)
       .replace("${topic.description}", topic.description);
 
+    // Agregar instrucciones adicionales para JSON limpio (especialmente para Ollama)
+    const enhancedPrompt = `${prompt}
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid JSON, nothing else before or after
+2. NO line breaks inside string values - use spaces instead
+3. Follow EXACTLY the JSON format specified in the prompt
+4. All field names must match exactly as requested
+5. No explanations, no markdown, no extra text`;
+
     const completion = await client.chat.completions.create({
       model: model,
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: enhancedPrompt }],
       temperature: 0.8,
-      max_tokens: 4000, // Aumentado para soportar 1500-2000 palabras + JSON
+      max_tokens: 4000,
     });
 
     const response = completion.choices[0]?.message?.content?.trim();
     if (!response) {
-      throw new Error("No se recibió respuesta de OpenAI");
+      throw new Error("No se recibió respuesta de la IA");
     }
 
     // Parsear JSON - Maneja bloques markdown y JSON plano
@@ -298,13 +308,31 @@ export async function generateScriptWithPrompt(
     }
 
     if (!jsonMatch) {
-      Logger.error("❌ Respuesta de OpenAI no contiene JSON:");
-      Logger.error(response.substring(0, 500)); // Mostrar primeros 500 chars
+      Logger.error("❌ Respuesta no contiene JSON:");
+      Logger.error(response.substring(0, 500));
       throw new Error("Respuesta no contiene JSON válido");
     }
 
-    const jsonString = jsonMatch[1] || jsonMatch[0];
-    const parsed = JSON.parse(jsonString);
+    // Limpiar caracteres de control del JSON
+    let jsonString = jsonMatch[1] || jsonMatch[0];
+
+    // 🔧 LIMPIEZA: Remover caracteres de control inválidos para JSON
+    // Preservar \n, \r, \t válidos pero eliminar otros caracteres de control
+    jsonString = jsonString
+      .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, "") // Remover caracteres de control excepto \t, \n, \r
+      .replace(/\n/g, "\\n") // Escapar saltos de línea dentro de strings
+      .replace(/\r/g, "\\r") // Escapar retornos de carro
+      .replace(/\t/g, "\\t"); // Escapar tabs
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonString);
+    } catch (parseError: any) {
+      Logger.error("❌ Error parseando JSON:");
+      Logger.error("JSON problemático (primeros 500 chars):");
+      Logger.error(jsonString.substring(0, 500));
+      throw new Error(`JSON inválido: ${parseError.message}`);
+    }
     const narrative = parsed.narrative || parsed.script || "";
     const wordCount = narrative.split(/\s+/).length;
     const estimatedDuration =

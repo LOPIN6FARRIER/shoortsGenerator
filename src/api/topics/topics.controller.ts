@@ -40,7 +40,7 @@ export async function getTopics(
       openai_tokens_used as "openaiTokensUsed",
       created_at as "createdAt"
     FROM topics
-    ORDER BY created_at DESC
+    ORDER BY generated_at DESC, created_at DESC
     LIMIT $1 OFFSET $2
   `;
 

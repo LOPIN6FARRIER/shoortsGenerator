@@ -68,13 +68,6 @@ export async function generateTTS(
 
     await execAsync(command);
 
-    // 🎵 FUTURO: Mezclar con música de fondo si está habilitado
-    // if (channelConfig.audio.backgroundMusic.enabled) {
-    //   await mixWithBackgroundMusic(tempAudioPath, audioPath, channelConfig);
-    // } else {
-    //   renameSync(tempAudioPath, audioPath);
-    // }
-
     // Por ahora, simplemente renombrar
     if (existsSync(tempAudioPath)) {
       if (existsSync(audioPath)) unlinkSync(audioPath);
@@ -82,13 +75,40 @@ export async function generateTTS(
         process.platform === "win32"
           ? `move "${tempAudioPath}" "${audioPath}"`
           : `mv "${tempAudioPath}" "${audioPath}"`;
+      
       await execAsync(renameCommand);
+      
+      // 🔧 Verificar que el archivo final existe y tiene contenido
+      if (!existsSync(audioPath)) {
+        throw new Error(`Audio file not created at ${audioPath}`);
+      }
+      
+      // Pequeña pausa para asegurar que el archivo se escribió completamente
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      throw new Error(`Temp audio file not created by edge-tts: ${tempAudioPath}`);
     }
 
     // Obtener duración del audio con ffprobe
     const durationCommand = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`;
-    const { stdout } = await execAsync(durationCommand);
-    const duration = Math.ceil(parseFloat(stdout.trim()));
+    
+    let duration: number;
+    try {
+      const { stdout } = await execAsync(durationCommand);
+      duration = Math.ceil(parseFloat(stdout.trim()));
+      
+      if (isNaN(duration) || duration <= 0) {
+        throw new Error(`Invalid duration: ${stdout.trim()}`);
+      }
+    } catch (ffprobeError: any) {
+      Logger.error("❌ Error obteniendo duración con ffprobe:", ffprobeError.message);
+      Logger.warn("⚠️  Estimando duración basada en palabras...");
+      
+      // Fallback: estimar duración basada en palabras
+      const wordCount = script.narrative.split(/\s+/).length;
+      duration = Math.ceil(wordCount / 2.5); // ~2.5 palabras por segundo
+      Logger.info(`📊 Duración estimada: ${duration}s (${wordCount} palabras)`);
+    }
 
     // Limpiar archivo temporal
     if (existsSync(textPath)) {
