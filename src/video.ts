@@ -20,6 +20,38 @@ export interface VideoResult {
 }
 
 /**
+ * Calcula el estilo de subtítulos optimizado según la orientación del video
+ */
+function getSubtitleStyle(
+  width: number,
+  height: number,
+  channelConfig: any,
+): string {
+  const isLandscape = width > height;
+
+  // Ajustar parámetros según orientación
+  const fontSize = isLandscape ? 16 : channelConfig.visual.fontSize;
+  const marginV = isLandscape ? 30 : 50;
+  const marginL = isLandscape ? 50 : 180;
+  const marginR = isLandscape ? 50 : 180;
+
+  return [
+    `FontName=${channelConfig.visual.fontFamily}`,
+    `FontSize=${fontSize}`,
+    `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
+    `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
+    `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
+    `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
+    `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
+    `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
+    `Alignment=2`,
+    `MarginV=${marginV}`,
+    `MarginL=${marginL}`,
+    `MarginR=${marginR}`,
+  ].join(",");
+}
+
+/**
  * 🔥 GENERADOR DE VIDEO OPTIMIZADO PARA MÁXIMA RETENCIÓN
  *
  * Características virales:
@@ -127,21 +159,8 @@ export async function generateVideo(
     const concatInputs = imagePaths.map((_, i) => `[v${i}]`).join("");
     const audioIndex = imagePaths.length;
 
-    // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL
-    const subtitleStyle = [
-      `FontName=${channelConfig.visual.fontFamily}`,
-      `FontSize=${channelConfig.visual.fontSize}`,
-      `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
-      `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
-      `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
-      `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
-      `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
-      `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
-      `Alignment=2`, // Centrado inferior
-      `MarginV=50`, // Margen inferior mínimo
-      `MarginL=180`, // Margen izquierdo amplio para no salirse de pantalla
-      `MarginR=180`, // Margen derecho amplio para no salirse de pantalla
-    ].join(",");
+    // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL (ajustado por orientación)
+    const subtitleStyle = getSubtitleStyle(width, height, channelConfig);
 
     filterComplex =
       `${videoFilters};${concatInputs}concat=n=${imagePaths.length}:v=1:a=0[vconcat];` +
@@ -204,21 +223,8 @@ export async function generateVideo(
 
     const concatInputs = imagePaths.map((_, i) => `[v${i}]`).join("");
 
-    // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL
-    const subtitleStyle = [
-      `FontName=${channelConfig.visual.fontFamily}`,
-      `FontSize=${channelConfig.visual.fontSize}`,
-      `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
-      `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
-      `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
-      `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
-      `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
-      `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
-      `Alignment=2`, // Centrado inferior
-      `MarginV=50`,
-      `MarginL=180`,
-      `MarginR=180`,
-    ].join(",");
+    // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL (ajustado por orientación)
+    const subtitleStyle = getSubtitleStyle(width, height, channelConfig);
 
     filterComplex =
       `${videoFilters};${concatInputs}concat=n=${imagePaths.length}:v=1:a=0[vconcat];` +
@@ -289,20 +295,8 @@ export async function generateVideo(
           const concatInputs = fallbackImages.map((_, i) => `[v${i}]`).join("");
           const audioIndex = fallbackImages.length;
 
-          const subtitleStyle = [
-            `FontName=${channelConfig.visual.fontFamily}`,
-            `FontSize=${channelConfig.visual.fontSize}`,
-            `Bold=${channelConfig.visual.subtitleStyle.fontWeight === "bold" ? "1" : "0"}`,
-            `PrimaryColour=&H${hexToABGR(channelConfig.visual.primaryColor)}`,
-            `OutlineColour=&H${hexToABGR(channelConfig.visual.subtitleStyle.strokeColor)}`,
-            `Outline=${channelConfig.visual.subtitleStyle.strokeWidth}`,
-            `Shadow=${Math.round(channelConfig.visual.subtitleStyle.shadowOpacity * 3)}`,
-            `BackColour=&H${hexToABGRWithOpacity(channelConfig.visual.subtitleStyle.backgroundColor, channelConfig.visual.subtitleStyle.backgroundOpacity)}`,
-            `Alignment=2`,
-            `MarginV=50`,
-            `MarginL=180`,
-            `MarginR=180`,
-          ].join(",");
+          // 🎨 SUBTÍTULOS CON ESTILO DE IDENTIDAD DE CANAL (ajustado por orientación)
+          const subtitleStyle = getSubtitleStyle(width, height, channelConfig);
 
           const filterComplex =
             `${videoFilters};${concatInputs}concat=n=${fallbackImages.length}:v=1:a=0[vconcat];` +
@@ -377,16 +371,21 @@ async function generateVideoWithGradient(
   dimensions?: { width: number; height: number; fps: number },
 ): Promise<VideoResult> {
   const { width, height, fps } = dimensions || CONFIG.video;
+  const language = script.language as "es" | "en";
+  const channelConfig = getChannelConfig(language);
   const outputVideoPath = join(outputDir, "final.mp4");
   const backgroundPath = join(outputDir, "background.png");
 
   await generateBackground(backgroundPath, width, height);
 
+  // Usar estilo de subtítulos ajustado por orientación
+  const subtitleStyle = getSubtitleStyle(width, height, channelConfig);
+
   try {
     const ffmpegCommand =
       `ffmpeg -loop 1 -i "${backgroundPath}" -i "${audioPath}" ` +
       `-filter_complex "[0:v]scale=${width}:${height},zoompan=z='min(zoom+0.0005,1.1)':d=1:s=${width}x${height}:fps=${fps}[v];` +
-      `[v]subtitles='${srtPath.replace(/\\/g, "/")}':force_style='FontName=Arial Bold,FontSize=24,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=180'[outv]" ` +
+      `[v]subtitles='${srtPath.replace(/\\/g, "/")}':force_style='${subtitleStyle}'[outv]" ` +
       `-map "[outv]" -map 1:a -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k ` +
       `-shortest -t ${duration} -pix_fmt yuv420p "${outputVideoPath}" -y`;
 

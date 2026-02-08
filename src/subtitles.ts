@@ -45,26 +45,36 @@ function getOpenAIClient(): OpenAI {
  * - Sincronización automática con el audio
  * - Detecta pausas naturales
  * - Agrupa palabras en segmentos óptimos
+ * - Ajusta automáticamente para videos horizontales (landscape)
  */
 export async function generateShortsOptimizedSRT(
   script: Script,
   audioPath: string,
   outputPath: string,
+  dimensions?: { width: number; height: number },
 ): Promise<string> {
   const language = script.language as "es" | "en";
   const channelConfig = getChannelConfig(language);
 
-  Logger.info("Generando subtítulos con Whisper AI (timing perfecto)...");
+  // Detectar orientación y ajustar configuración de subtítulos
+  const isLandscape = dimensions && dimensions.width > dimensions.height;
+  const maxCharsPerLine = isLandscape ? 35 : channelConfig.subtitles.maxCharsPerLine;
+  const maxLines = isLandscape ? 3 : channelConfig.subtitles.maxLines;
+
+  Logger.info(`Generando subtítulos con Whisper AI (timing perfecto)...`);
+  if (isLandscape) {
+    Logger.info(`📐 Modo horizontal: ${maxLines} líneas, ${maxCharsPerLine} caracteres por línea`);
+  }
 
   try {
     // 1. Transcribir audio con Whisper para obtener timestamps
     const words = await transcribeWithWhisper(audioPath, language);
 
-    // 2. Agrupar palabras en segmentos óptimos para Shorts
+    // 2. Agrupar palabras en segmentos óptimos
     const segments = groupWordsIntoSegments(
       words,
-      channelConfig.subtitles.maxCharsPerLine,
-      channelConfig.subtitles.maxLines,
+      maxCharsPerLine,
+      maxLines,
     );
 
     // 3. Aplicar énfasis a palabras clave si está habilitado
@@ -96,7 +106,7 @@ export async function generateShortsOptimizedSRT(
   } catch (error: any) {
     Logger.warn(`⚠️  Error con Whisper, usando fallback: ${error.message}`);
     // Fallback al método anterior si Whisper falla
-    return generateFallbackSRT(script, audioPath, outputPath);
+    return generateFallbackSRT(script, audioPath, outputPath, dimensions);
   }
 }
 
@@ -203,9 +213,15 @@ function generateFallbackSRT(
   script: Script,
   audioPath: string,
   outputPath: string,
+  dimensions?: { width: number; height: number },
 ): string {
   const language = script.language as "es" | "en";
   const channelConfig = getChannelConfig(language);
+
+  // Detectar orientación y ajustar configuración de subtítulos
+  const isLandscape = dimensions && dimensions.width > dimensions.height;
+  const maxCharsPerLine = isLandscape ? 35 : channelConfig.subtitles.maxCharsPerLine;
+  const maxLines = isLandscape ? 3 : channelConfig.subtitles.maxLines;
 
   Logger.info("Usando método de timing manual (fallback)...");
 
@@ -215,8 +231,7 @@ function generateFallbackSRT(
     words.length / channelConfig.subtitles.wordsPerSecond;
 
   const avgCharsPerWord = language === "es" ? 5.5 : 4.7;
-  const maxCharsTotal =
-    channelConfig.subtitles.maxLines * channelConfig.subtitles.maxCharsPerLine;
+  const maxCharsTotal = maxLines * maxCharsPerLine;
   const wordsPerSegment = Math.floor(maxCharsTotal / avgCharsPerWord);
   const totalSegments = Math.ceil(words.length / wordsPerSegment);
   const timePerSegment = estimatedDuration / totalSegments;
@@ -235,10 +250,8 @@ function generateFallbackSRT(
       });
     }
 
-    const lines = splitIntoLines(text, channelConfig.subtitles.maxCharsPerLine);
-    const finalText = lines
-      .slice(0, channelConfig.subtitles.maxLines)
-      .join("\n");
+    const lines = splitIntoLines(text, maxCharsPerLine);
+    const finalText = lines.slice(0, maxLines).join("\n");
 
     const startSeconds = (segmentIndex - 1) * timePerSegment;
     const endSeconds = segmentIndex * timePerSegment;

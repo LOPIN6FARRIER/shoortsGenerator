@@ -302,6 +302,10 @@ async function processChannelGroup(
       script,
       ttsResult.audioPath,
       outputDir,
+      {
+        width: channel.video_width,
+        height: channel.video_height,
+      },
     );
 
     // Video
