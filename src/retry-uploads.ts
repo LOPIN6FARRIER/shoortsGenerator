@@ -6,7 +6,6 @@ import {
   markVideoUploadSuccess,
   markVideoUploadFailed,
   logError,
-  closeDatabase,
   type ChannelConfig,
   getActiveChannels,
 } from "./database.js";
@@ -193,9 +192,9 @@ export async function retryPendingUploads(): Promise<void> {
       error_message: error.message,
       stack_trace: error.stack,
     });
-  } finally {
-    closeDatabase();
   }
+  // Note: Database pool is kept open for cron jobs
+  // It will be closed on application shutdown
 }
 
 // Si se ejecuta directamente

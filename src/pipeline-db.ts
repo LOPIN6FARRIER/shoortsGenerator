@@ -25,7 +25,6 @@ import {
   saveYouTubeUpload,
   saveResourceUsage,
   logError,
-  closeDatabase,
   markVideoUploadFailed,
   markVideoUploadSuccess,
   type ChannelConfig,
@@ -211,9 +210,9 @@ export async function executePipelineFromDB(
       await failPipelineExecution(executionId, error.message);
     }
     throw error;
-  } finally {
-    closeDatabase();
   }
+  // Note: Database pool is kept open for cron jobs
+  // It will be closed on application shutdown
 }
 
 /**

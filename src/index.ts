@@ -26,10 +26,10 @@ function shouldExecuteNow(cronSchedule: string): boolean {
   try {
     const interval = CronExpressionParser.parse(cronSchedule);
     const now = new Date();
-    
+
     // Obtener la última vez que debió ejecutarse
     const prevRun = interval.prev().toDate();
-    
+
     // Calcular cuánto tiempo pasó desde la última ejecución programada
     const timeSinceLastRun = now.getTime() - prevRun.getTime();
 
@@ -127,6 +127,21 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Graceful shutdown handler
+process.on("SIGTERM", async () => {
+  Logger.info("SIGTERM recibido, cerrando aplicación...");
+  const { closeDatabase } = await import("./database.js");
+  await closeDatabase();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  Logger.info("SIGINT recibido, cerrando aplicación...");
+  const { closeDatabase } = await import("./database.js");
+  await closeDatabase();
+  process.exit(0);
+});
 
 if (process.env.RUN_ONCE === "true") {
   Logger.info("Modo ejecución única al inicio");
