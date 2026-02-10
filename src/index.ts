@@ -20,18 +20,22 @@ export { Logger } from "./utils.js";
 
 /**
  * Evalúa si un cron schedule debe ejecutarse en este momento
- * Compara la próxima ejecución con la ventana de verificación (10 min)
+ * Compara la última ejecución programada con la ventana de verificación (30 min)
  */
 function shouldExecuteNow(cronSchedule: string): boolean {
   try {
     const interval = CronExpressionParser.parse(cronSchedule);
-    const nextRun = interval.next().toDate();
     const now = new Date();
-    const diff = nextRun.getTime() - now.getTime();
+    
+    // Obtener la última vez que debió ejecutarse
+    const prevRun = interval.prev().toDate();
+    
+    // Calcular cuánto tiempo pasó desde la última ejecución programada
+    const timeSinceLastRun = now.getTime() - prevRun.getTime();
 
-    // Si la próxima ejecución es dentro de los próximos 10 minutos, ejecutar
-    const TEN_MINUTES = 10 * 60 * 1000;
-    return diff >= 0 && diff <= TEN_MINUTES;
+    // Si la última ejecución fue dentro de los últimos 30 minutos, ejecutar
+    const THIRTY_MINUTES = 30 * 60 * 1000;
+    return timeSinceLastRun >= 0 && timeSinceLastRun <= THIRTY_MINUTES;
   } catch (error) {
     Logger.error(`Error evaluando cron schedule: ${cronSchedule}`, error);
     return false;
