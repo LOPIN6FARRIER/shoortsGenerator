@@ -1,5 +1,6 @@
 import pino from "pino";
-import { existsSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, unlinkSync, rmSync } from "fs";
+import { dirname } from "path";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 
@@ -89,6 +90,38 @@ export function cleanupFile(filePath: string): void {
     }
   } catch (error) {
     Logger.error(`Error al eliminar archivo ${filePath}:`, error);
+  }
+}
+
+/**
+ * Elimina un directorio completo y todo su contenido
+ */
+export function cleanupDirectory(dirPath: string): void {
+  try {
+    if (existsSync(dirPath)) {
+      rmSync(dirPath, { recursive: true, force: true });
+      Logger.success(`📁 Directorio eliminado: ${dirPath}`);
+    }
+  } catch (error) {
+    Logger.error(`Error al eliminar directorio ${dirPath}:`, error);
+  }
+}
+
+/**
+ * Elimina el directorio de un video después de subida exitosa
+ * Extrae el path del directorio desde la ruta del video
+ */
+export function cleanupVideoDirectory(videoPath: string): void {
+  try {
+    // Obtener el directorio del video (ej: output/es/2026-02-12-title/)
+    const videoDir = dirname(videoPath);
+    
+    if (existsSync(videoDir)) {
+      Logger.info(`🧹 Limpiando archivos del video: ${videoDir}`);
+      cleanupDirectory(videoDir);
+    }
+  } catch (error) {
+    Logger.error(`Error al limpiar directorio del video ${videoPath}:`, error);
   }
 }
 

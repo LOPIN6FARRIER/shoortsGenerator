@@ -6,6 +6,7 @@ import {
   ensureDir,
   generateTimestamp,
   sanitizeFilename,
+  cleanupVideoDirectory,
 } from "./utils.js";
 import { generateTopic } from "./topic.js";
 import { generateTTS, checkEdgeTTS } from "./tts.js";
@@ -133,6 +134,9 @@ async function processChannel(
       privacy_status: "public",
       upload_duration_seconds: uploadDuration,
     });
+
+    // Limpiar archivos del disco después de subida exitosa
+    cleanupVideoDirectory(videoResult.videoPath);
   }
 
   const totalTime = Math.round((Date.now() - startTime) / 1000);
@@ -382,6 +386,9 @@ async function processChannelLegacy(
     script,
     channelConfig,
   );
+
+  // Limpiar archivos del disco después de subida exitosa (legacy)
+  cleanupVideoDirectory(videoResult.videoPath);
 
   return {
     videoPath: videoResult.videoPath,

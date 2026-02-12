@@ -6,6 +6,7 @@ import {
   ensureDir,
   generateTimestamp,
   sanitizeFilename,
+  cleanupVideoDirectory,
 } from "./utils.js";
 import { generateTopic } from "./topic.js";
 import { generateTTS, checkEdgeTTS } from "./tts.js";
@@ -381,6 +382,9 @@ async function processChannelGroup(
 
         // Marcar video como exitosamente subido
         await markVideoUploadSuccess(videoDbId);
+
+        // Limpiar archivos del disco después de subida exitosa
+        cleanupVideoDirectory(videoResult.videoPath);
 
         results.push({
           channelName: channel.name,

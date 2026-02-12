@@ -1,4 +1,4 @@
-import { Logger } from "./utils.js";
+import { Logger, cleanupVideoDirectory } from "./utils.js";
 import {
   initDatabase,
   getPendingUploadVideos,
@@ -143,6 +143,9 @@ export async function retryPendingUploads(): Promise<void> {
 
         // Marcar como exitoso
         await markVideoUploadSuccess(video.id!);
+
+        // Limpiar archivos del disco después de subida exitosa
+        cleanupVideoDirectory(video.file_path);
 
         Logger.success(`✅ ${video.script_title}: ${uploadResult.url}`);
         successCount++;
