@@ -1,6 +1,6 @@
 import { CONFIG } from "./config.js";
 import { Logger } from "./utils.js";
-import { getLatestTopic } from "./database.js";
+import { getLatestTopic, getRecentTopics } from "./database.js";
 import { getLLMClient, getModel } from "./llm.js";
 
 export interface Topic {
@@ -58,14 +58,16 @@ Rules:
 
 CRITICAL: Return ONLY valid JSON, nothing else. No explanations, no markdown, no extra text.
 
-JSON format:
+JSON format (create unique content, do NOT copy examples):
 {
-  "id": string,
-  "title": string,
-  "description": string,
-  "imageKeywords": string (ONLY 2-3 simple keywords in English for Unsplash search. Examples: "library books", "laundry machine", "parking lot aerial", "coffee shop". NO commas, NO long phrases),
-  "videoKeywords": string (ONLY 2-3 simple keywords in English for Pexels VIDEO search. Use action-related terms. Examples: "workers painting", "machines working", "people walking", "water flowing". NO commas, NO long phrases)
-}`;
+  "id": "your-topic-id-here",
+  "title": "Your Unique Topic Title",
+  "description": "Your detailed description of the topic",
+  "imageKeywords": "2-3 simple search keywords in English (format examples: 'library books' or 'coffee shop' or 'parking lot' - but use keywords relevant to YOUR topic)",
+  "videoKeywords": "2-3 action keywords in English for video search (format examples: 'workers painting' or 'people walking' - but use keywords relevant to YOUR topic)"
+}
+
+⚠️ IMPORTANT: The example keywords shown are FORMAT GUIDES only. Generate NEW keywords specific to your generated topic!`;
 
   if (channelId) {
     const { getChannelPrompts } = await import("./database.js");
@@ -74,6 +76,26 @@ JSON format:
       prompt = prompts[0].prompt_text;
       Logger.info(`📋 Usando prompt personalizado del canal`);
     }
+  }
+
+  // 🚫 EVITAR REPETICIÓN: Obtener topics recientes para no duplicar
+  const recentTopics = await getRecentTopics(20);
+  if (recentTopics.length > 0) {
+    const topicsList = recentTopics
+      .map((t, i) => `${i + 1}. "${t.title}"`)
+      .join("\n");
+    
+    const avoidRepetitionNote = `
+
+🚫 AVOID REPETITION - Recently used topics (DO NOT generate similar topics):
+${topicsList}
+
+⚠️ Your new topic MUST be COMPLETELY DIFFERENT from all the topics listed above.
+Generate a fresh, unique topic that hasn't been covered yet.
+`;
+    
+    prompt = prompt + avoidRepetitionNote;
+    Logger.info(`🔍 Evitando repetición de ${recentTopics.length} topics recientes`);
   }
 
   try {
@@ -102,6 +124,8 @@ JSON format:
       ],
       temperature: temperature,
       response_format: { type: "json_object" },
+      frequency_penalty: 0.7, // Penalizar palabras repetidas (aumentado para evitar topics similares)
+      presence_penalty: 0.5, // Penalizar temas repetidos (aumentado para mayor originalidad)
     });
 
     const content = response.choices[0]?.message?.content;
@@ -142,6 +166,18 @@ JSON format:
       timestamp: new Date().toISOString(),
       tokensUsed,
     };
+
+    // 🔍 Verificar si el topic es muy similar a uno existente
+    const { checkDuplicateTopic } = await import("./database.js");
+    const isDuplicate = await checkDuplicateTopic(topic.title);
+    if (isDuplicate) {
+      Logger.warn(
+        `⚠️ ADVERTENCIA: Topic similar ya existe en BD: "${topic.title}"`,
+      );
+      Logger.warn(
+        "   Considera ajustar los prompts o aumentar frequency_penalty",
+      );
+    }
 
     Logger.success(`Topic generado: ${topic.title} (${tokensUsed} tokens)`);
     return topic;

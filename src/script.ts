@@ -99,6 +99,8 @@ Devuelve SOLO el texto narrativo en ${languageName}, sin formato adicional.`;
       messages: [{ role: "user", content: prompt }],
       temperature: 0.8, // Mayor creatividad para hooks virales
       max_tokens: 450,
+      frequency_penalty: 0.6, // Penalizar palabras/frases repetidas
+      presence_penalty: 0.4, // Penalizar temas/ideas repetidas
     });
 
     // 🛡️ VALIDACIÓN ROBUSTA: Verificar respuesta antes de usar
@@ -143,10 +145,12 @@ REQUISITOS ESTRICTOS:
 - Formato directo y contundente
 - Capitalización estratégica si aplica
 
-Ejemplos buenos:
-- "El trabajo más invisible de la ciudad"
-- "Nadie sabe quién hace esto"
-- "El secreto detrás de las líneas amarillas"
+Ejemplos de ESTILO (crea tu propio título único sobre el contenido):
+- "El trabajo más invisible de la ciudad" (formato: adjetivo + sustantivo + contexto)
+- "Nadie sabe quién hace esto" (formato: misterio directo)
+- "El secreto detrás de las líneas amarillas" (formato: revelación)
+
+⚠️ NO copies estos ejemplos literalmente - crea un título único para ESTE contenido específico.
 
 Devuelve SOLO el título en español, sin comillas ni formato adicional.`
         : `Generate a VIRAL title for YouTube Shorts about this content IN ENGLISH:
@@ -162,10 +166,12 @@ STRICT REQUIREMENTS:
 - Direct and impactful format
 - Strategic capitalization if applicable
 
-Good examples:
-- "The city's most invisible job"
-- "Nobody knows who does this"
-- "The secret behind yellow lines"
+STYLE examples (create your own unique title about the content):
+- "The city's most invisible job" (style: adjective + noun + context)
+- "Nobody knows who does this" (style: direct mystery)
+- "The secret behind yellow lines" (style: revelation)
+
+⚠️ DO NOT copy these examples literally - create a unique title for THIS specific content.
 
 Return ONLY the title in English, without quotes or additional formatting.`;
 
@@ -174,6 +180,8 @@ Return ONLY the title in English, without quotes or additional formatting.`;
       messages: [{ role: "user", content: titlePrompt }],
       temperature: 0.9, // Alta creatividad para títulos virales
       max_tokens: 40,
+      frequency_penalty: 0.5, // Evitar títulos repetitivos
+      presence_penalty: 0.3,
     });
 
     // 🛡️ VALIDACIÓN: Verificar respuesta de título o usar fallback
@@ -196,7 +204,7 @@ IMPORTANTE: La descripción debe estar 100% EN ESPAÑOL. No uses palabras en ing
 
 REQUISITOS:
 - 2-3 oraciones cortas
-- Incluye CTA sutil: "¿Qué opinas?" o "Comenta tu experiencia"
+- Incluye CTA sutil (ejemplos de formato: "¿Qué opinas?" o "Comenta tu experiencia" - pero crea tu propia variación relevante)
 - Lenguaje cercano y conversacional
 - Máximo 150 caracteres
 
@@ -209,7 +217,7 @@ IMPORTANT: The description must be 100% IN ENGLISH. Do not use Spanish words.
 
 REQUIREMENTS:
 - 2-3 short sentences
-- Include subtle CTA: "What do you think?" or "Share your experience"
+- Include subtle CTA (format examples: "What do you think?" or "Share your experience" - but create your own relevant variation)
 - Friendly and conversational language
 - Maximum 150 characters
 
@@ -220,6 +228,8 @@ Return ONLY the description in English, without quotes or additional formatting.
       messages: [{ role: "user", content: descriptionPrompt }],
       temperature: 0.8,
       max_tokens: 80,
+      frequency_penalty: 0.5, // Evitar descripciones repetitivas
+      presence_penalty: 0.3,
     });
 
     const description =
@@ -276,7 +286,7 @@ export async function generateScriptWithPrompt(
     Logger.info(`   Title: "${topic.title}"`);
     Logger.info(`   Description: "${topic.description.substring(0, 150)}..."`);
     Logger.info(`   Target language: ${language.toUpperCase()}`);
-    
+
     let prompt = customPrompt
       .replace(/\$\{topic\.title\}/g, topic.title)
       .replace(/\$\{topic\.description\}/g, topic.description);
@@ -289,13 +299,13 @@ The script must be ENTIRELY in ${languageName.toUpperCase()}.
 If the topic title or description is in another language, translate and adapt the content naturally to ${languageName}.
 The final script must sound native in ${languageName}, not like a translation.
 `;
-    
+
     prompt = translationNote + "\n" + prompt;
 
     Logger.info(`\n📝 PROMPT DESPUÉS DE REEMPLAZAR VARIABLES:`);
     Logger.info(prompt.substring(0, 500) + "...\n");
 
-    // Agregar instrucciones adicionales para JSON limpio (especialmente para Ollama)
+    // Agregar instrucciones adicionales para JSON limpio (especialmente para Ollama/Qwen)
     const enhancedPrompt = `${prompt}
 
 ─────────────────────────────────────────
@@ -303,30 +313,32 @@ The final script must sound native in ${languageName}, not like a translation.
 ─────────────────────────────────────────
 
 1. Return ONLY valid JSON - nothing before, nothing after
-2. NO line breaks inside string values (use spaces or \\n escape sequence)
-3. All strings must be on a SINGLE LINE
+2. NO literal line breaks inside string values - use SPACES instead
+3. All strings must be CONTINUOUS without line breaks
 4. Use double quotes for strings, NO single quotes
-5. No trailing commas in objects or arrays
-6. All field names must match exactly as specified
-7. Do NOT wrap in markdown code blocks like \`\`\`json
-8. Do NOT add explanations or comments
+5. "tags" MUST be an ARRAY of relevant keywords (3-5 tags), NOT generic placeholders
+6. "estimated_duration" must be a NUMBER in seconds based on your actual content length
+7. Do NOT copy the example values - create content specific to the topic
+8. Do NOT wrap in markdown code blocks
 
-VALID EXAMPLE:
-{"title": "Short title", "narrative": "This is a long text that stays on one line even if it's very long", "description": "Description here"}
+✅ VALID FORMAT (create your own relevant content):
+{"title": "Your Actual Title Here", "narrative": "Your actual narrative content that stays on one continuous line without breaks", "description": "Your actual description", "tags": ["relevant", "keywords", "for", "this", "topic"], "estimated_duration": 47}
 
-INVALID EXAMPLE (DO NOT DO THIS):
-{
-  "narrative": "This text breaks
-  into multiple lines"
-}
+❌ INVALID (DO NOT copy example literally):
+{"title": "Short title", "tags": ["shorts", "topic"], "narrative": "Text with
+literal line breaks"}
 
-Return the JSON NOW:`;
+⚠️ IMPORTANT: Replace ALL placeholder text with real content about the topic!
+
+Return ONLY the raw JSON object NOW:`;
 
     const completion = await client.chat.completions.create({
       model: model,
       messages: [{ role: "user", content: enhancedPrompt }],
       temperature: 0.7, // Reducir temperatura para mayor consistencia
       max_tokens: 7000,
+      frequency_penalty: 0.6, // Penalizar palabras/frases repetidas
+      presence_penalty: 0.4, // Penalizar temas/ideas repetidas
     });
 
     const response = completion.choices[0]?.message?.content?.trim();
@@ -365,23 +377,37 @@ Return the JSON NOW:`;
     try {
       parsed = JSON.parse(jsonString);
     } catch (parseError: any) {
-      // Segundo intento: escapar saltos de línea dentro de strings
+      // Segundo intento: limpieza agresiva de saltos de línea literales
       Logger.warn(
-        "⚠️ Primer intento falló, limpiando saltos de línea en strings...",
+        "⚠️ Primer intento falló, limpiando saltos de línea literales...",
       );
       try {
-        // Estrategia: reemplazar saltos de línea dentro de valores de string por espacios
-        const cleanedJson = jsonString.replace(
-          /"([^"\\]*(?:\\.[^"\\]*)*)"/g,
+        let cleanedJson = jsonString;
+        
+        // 1. Reemplazar saltos de línea literales dentro de valores por espacios
+        // Buscar patrones como: "key":"value con\nsalto de línea"
+        cleanedJson = cleanedJson.replace(
+          /:\s*"([^"]*)"/gs,
           (match, content) => {
-            // Dentro de cada string, reemplazar saltos de línea por espacios
+            // Reemplazar \n literales por espacio en valores
             const cleaned = content
-              .replace(/\n/g, " ") // \n → espacio
-              .replace(/\s+/g, " ") // múltiples espacios → uno
+              .replace(/\n/g, " ")
+              .replace(/\r/g, "")
+              .replace(/\s+/g, " ")
               .trim();
-            return `"${cleaned}"`;
+            return `: "${cleaned}"`;
           },
         );
+        
+        // 2. Corregir tags si está como string en lugar de array
+        // Cambia "tags":"["tag1","tag2"]" a "tags":["tag1","tag2"]
+        cleanedJson = cleanedJson.replace(
+          /"tags"\s*:\s*"(\[[^\]]+\])"/g,
+          (match, content) => {
+            return `"tags":${content}`;
+          },
+        );
+        
         parsed = JSON.parse(cleanedJson);
         Logger.success("✅ JSON parseado exitosamente después de limpieza");
       } catch (secondError: any) {
