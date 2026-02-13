@@ -8,7 +8,7 @@ import {
   sanitizeFilename,
   cleanupVideoDirectory,
 } from "./utils.js";
-import { generateTopic } from "./topic.js";
+import { generateTopic, Topic } from "./topic.js";
 import { generateTTS, checkEdgeTTS } from "./tts.js";
 import { generateShortsOptimizedSRT } from "./subtitles.js";
 import { generateVideo, checkFFmpeg } from "./video.js";
@@ -232,40 +232,54 @@ async function processChannelGroup(
     throw new Error("Faltan dependencias (edge-tts o ffmpeg)");
   }
 
-  // PASO 1: Generar Topic (compartido para todo el grupo)
-  Logger.info("\n📝 PASO 1: Generando topic...");
-  const firstChannel = channels[0];
+  // PASO 1: Generar Topics por idioma (uno por cada idioma del grupo)
+  Logger.info("\n📝 PASO 1: Generando topics por idioma...");
+  const topics = new Map<string, Topic>();
 
-  // Prompts ya validados en executePipelineFromDB
-  const topicPrompts = await getChannelPrompts(firstChannel.id, "topic");
+  // Obtener idiomas únicos del grupo
+  const uniqueLanguages = [...new Set(channels.map((ch) => ch.language))];
 
-  const topic = await generateTopic(
-    firstChannel.language as "es" | "en",
-    firstChannel.id,
-  );
-  Logger.success(`Topic: "${topic.title}"`);
+  for (const language of uniqueLanguages) {
+    // Usar el primer canal de este idioma para obtener los prompts
+    const channelForLang = channels.find((ch) => ch.language === language)!;
+    const topicPrompts = await getChannelPrompts(channelForLang.id, "topic");
 
-  const topicDbId = await saveTopic({ ...topic, execution_id: executionId });
+    const topic = await generateTopic(
+      language as "es" | "en",
+      channelForLang.id,
+    );
+    Logger.success(`Topic (${language.toUpperCase()}): "${topic.title}"`);
 
-  // PASO 2: Generar Scripts por idioma
+    await saveTopic({ ...topic, execution_id: executionId });
+    topics.set(language, topic);
+  }
+
+  // PASO 2: Generar Scripts por idioma (uno por idioma único)
   Logger.info("\n📄 PASO 2: Generando scripts...");
   const scripts = new Map<string, { script: Script; scriptDbId: string }>();
 
-  for (const channel of channels) {
-    // Prompts ya validados en executePipelineFromDB
-    const scriptPrompts = await getChannelPrompts(channel.id, "script");
+  for (const language of uniqueLanguages) {
+    // Obtener el topic del idioma correspondiente
+    const topic = topics.get(language);
+    if (!topic) {
+      throw new Error(`No se encontró topic para el idioma: ${language}`);
+    }
+
+    // Usar el primer canal de este idioma para obtener el prompt
+    const channelForLang = channels.find((ch) => ch.language === language)!;
+    const scriptPrompts = await getChannelPrompts(channelForLang.id, "script");
 
     const script = await generateScriptWithPrompt(
       topic,
-      channel.language as "es" | "en",
+      language as "es" | "en",
       scriptPrompts[0].prompt_text,
     );
 
     const scriptDbId = await saveScript(script);
-    scripts.set(channel.language, { script, scriptDbId });
+    scripts.set(language, { script, scriptDbId });
 
     Logger.success(
-      `  ${channel.language.toUpperCase()}: ${script.narrative.split(" ").length} palabras`,
+      `  ${language.toUpperCase()}: ${script.narrative.split(" ").length} palabras`,
     );
   }
 
@@ -280,9 +294,9 @@ async function processChannelGroup(
 
     Logger.info(`\n🎬 Procesando: ${channel.name}`);
 
-    // Crear directorio de output
+    // Crear directorio de output usando el topic del script correspondiente
     const timestamp = generateTimestamp();
-    const sanitizedTitle = sanitizeFilename(topic.title);
+    const sanitizedTitle = sanitizeFilename(script.topic.title);
     const outputDir = join(
       CONFIG.paths.output,
       channel.language,
