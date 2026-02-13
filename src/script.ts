@@ -245,13 +245,20 @@ Return ONLY the description in English, without quotes or additional formatting.
     const descriptionTokens = descriptionCompletion.usage?.total_tokens || 0;
     const tokensUsed = narrativeTokens + titleTokens + descriptionTokens;
 
+    // Generar tags dinámicos basados en el topic si no vienen del modelo
+    const dynamicTags = [
+      "shorts",
+      ...topic.title.toLowerCase().split(" ").slice(0, 3),
+      topic.id,
+    ].filter((tag) => tag.length > 2); // Filtrar tags muy cortos
+
     const script: Script = {
       language,
       topic,
       title,
       narrative,
       description,
-      tags: ["shorts", "historia", "curiosidades", "inventos", topic.id],
+      tags: dynamicTags,
       estimatedDuration,
       tokensUsed,
     };
@@ -424,13 +431,20 @@ Return ONLY the raw JSON object NOW:`;
     const estimatedDuration =
       parsed.estimated_duration || Math.round(wordCount / 2.5);
 
+    // Generar tags dinámicos basados en el topic si el modelo no los proporciona
+    const dynamicTags = [
+      "shorts",
+      ...topic.title.toLowerCase().split(" ").slice(0, 3),
+      topic.id,
+    ].filter((tag) => tag.length > 2); // Filtrar tags muy cortos
+
     const script: Script = {
       language,
       topic,
       title: parsed.title || topic.title,
       narrative,
       description: parsed.description || topic.description,
-      tags: parsed.tags || ["shorts"],
+      tags: parsed.tags || dynamicTags,
       estimatedDuration,
       tokensUsed: completion.usage?.total_tokens || 0,
     };

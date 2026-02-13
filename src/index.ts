@@ -144,43 +144,21 @@ process.on("SIGINT", async () => {
 });
 
 if (process.env.RUN_ONCE === "true") {
-  Logger.info("Modo ejecución única al inicio");
+  Logger.info("Modo ejecución única - pipeline una vez, API activa");
 
-  // Start server first
-  startServer();
+  // Iniciar servidor API
+  await startServer();
 
-  // Ejecutar pipeline inmediatamente
-  if (process.env.RUN_CRON === "true") {
-    runPipeline()
-      .then(() => {
-        Logger.info("Primera ejecución completada");
-        Logger.info(
-          `Verificación de cron cada 10 minutos: ${CRON_CHECK_INTERVAL}`,
-        );
-        Logger.info("Esperando siguiente verificación...");
-      })
-      .catch((error) => {
-        Logger.error("Error en primera ejecución:", error);
-      });
+  // Ejecutar pipeline una vez (sin cron jobs)
+  try {
+    await runPipeline();
+    Logger.info("✅ Ejecución única completada - API sigue activa");
+  } catch (error) {
+    Logger.error("❌ Error en ejecución única:", error);
   }
 
-  // Después configurar cron normal
-  if (process.env.RUN_CRON === "true") {
-    // Cron principal: verificar canales cada 10 min
-    cron.schedule(CRON_CHECK_INTERVAL, async () => {
-      await runPipeline();
-    });
-
-    // Cron de reintentos: cada 2 horas
-    cron.schedule(CRON_RETRY_INTERVAL, async () => {
-      Logger.info("🔄 Ejecutando job de reintentos...");
-      await retryPendingUploads();
-    });
-
-    Logger.info(
-      `🔄 Job de reintentos configurado: cada 2 horas (${CRON_RETRY_INTERVAL})`,
-    );
-  }
+  // Mantener el proceso vivo con la API
+  Logger.info("🌐 API activa sin cron jobs - Presiona Ctrl+C para detener");
 } else {
   // Modo cron (ejecución programada)
 
