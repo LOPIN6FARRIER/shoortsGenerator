@@ -58,12 +58,16 @@ export async function generateShortsOptimizedSRT(
 
   // Detectar orientación y ajustar configuración de subtítulos
   const isLandscape = dimensions && dimensions.width > dimensions.height;
-  const maxCharsPerLine = isLandscape ? 35 : channelConfig.subtitles.maxCharsPerLine;
+  const maxCharsPerLine = isLandscape
+    ? 35
+    : channelConfig.subtitles.maxCharsPerLine;
   const maxLines = isLandscape ? 3 : channelConfig.subtitles.maxLines;
 
   Logger.info(`Generando subtítulos con Whisper AI (timing perfecto)...`);
   if (isLandscape) {
-    Logger.info(`📐 Modo horizontal: ${maxLines} líneas, ${maxCharsPerLine} caracteres por línea`);
+    Logger.info(
+      `📐 Modo horizontal: ${maxLines} líneas, ${maxCharsPerLine} caracteres por línea`,
+    );
   }
 
   try {
@@ -71,21 +75,18 @@ export async function generateShortsOptimizedSRT(
     const words = await transcribeWithWhisper(audioPath, language);
 
     // 2. Agrupar palabras en segmentos óptimos
-    const segments = groupWordsIntoSegments(
-      words,
-      maxCharsPerLine,
-      maxLines,
-    );
+    const segments = groupWordsIntoSegments(words, maxCharsPerLine, maxLines);
 
     // 3. Aplicar énfasis a palabras clave si está habilitado
-    if (channelConfig.subtitles.emphasizeKeywords) {
-      segments.forEach((seg) => {
-        channelConfig.subtitles.keywordIndicators.forEach((keyword) => {
-          const regex = new RegExp(`\\b${keyword}\\b`, "gi");
-          seg.text = seg.text.replace(regex, (match) => match.toUpperCase());
-        });
-      });
-    }
+    // (Funcionalidad de mayúsculas deshabilitada)
+    // if (channelConfig.subtitles.emphasizeKeywords) {
+    //   segments.forEach((seg) => {
+    //     channelConfig.subtitles.keywordIndicators.forEach((keyword) => {
+    //       const regex = new RegExp(`\\b${keyword}\\b`, "gi");
+    //       seg.text = seg.text.replace(regex, (match) => match.toUpperCase());
+    //     });
+    //   });
+    // }
 
     // 4. Generar contenido SRT
     const srtContent = segments
@@ -220,7 +221,9 @@ function generateFallbackSRT(
 
   // Detectar orientación y ajustar configuración de subtítulos
   const isLandscape = dimensions && dimensions.width > dimensions.height;
-  const maxCharsPerLine = isLandscape ? 35 : channelConfig.subtitles.maxCharsPerLine;
+  const maxCharsPerLine = isLandscape
+    ? 35
+    : channelConfig.subtitles.maxCharsPerLine;
   const maxLines = isLandscape ? 3 : channelConfig.subtitles.maxLines;
 
   Logger.info("Usando método de timing manual (fallback)...");
@@ -243,12 +246,13 @@ function generateFallbackSRT(
     const segmentWords = words.slice(i, i + wordsPerSegment);
     let text = segmentWords.join(" ");
 
-    if (channelConfig.subtitles.emphasizeKeywords) {
-      channelConfig.subtitles.keywordIndicators.forEach((keyword) => {
-        const regex = new RegExp(`\\b${keyword}\\b`, "gi");
-        text = text.replace(regex, (match) => match.toUpperCase());
-      });
-    }
+    // Funcionalidad de mayúsculas deshabilitada
+    // if (channelConfig.subtitles.emphasizeKeywords) {
+    //   channelConfig.subtitles.keywordIndicators.forEach((keyword) => {
+    //     const regex = new RegExp(`\\b${keyword}\\b`, "gi");
+    //     text = text.replace(regex, (match) => match.toUpperCase());
+    //   });
+    // }
 
     const lines = splitIntoLines(text, maxCharsPerLine);
     const finalText = lines.slice(0, maxLines).join("\n");
