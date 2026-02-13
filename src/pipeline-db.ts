@@ -232,43 +232,30 @@ async function processChannelGroup(
     throw new Error("Faltan dependencias (edge-tts o ffmpeg)");
   }
 
-  // PASO 1: Generar Topics por idioma (uno por cada idioma del grupo)
-  Logger.info("\n📝 PASO 1: Generando topics por idioma...");
-  const topics = new Map<string, Topic>();
+  // PASO 1: Generar UN SOLO Topic (compartido para todo el grupo)
+  Logger.info("\n📝 PASO 1: Generando topic compartido...");
+  const firstChannel = channels[0];
 
-  // Obtener idiomas únicos del grupo
+  const topic = await generateTopic(
+    firstChannel.language as "es" | "en",
+    firstChannel.id,
+  );
+  Logger.success(`Topic base (${firstChannel.language.toUpperCase()}): "${topic.title}"`);
+
+  await saveTopic({ ...topic, execution_id: executionId });
+
+  // PASO 2: Generar Scripts por idioma (mismo topic, diferentes idiomas)
+  Logger.info("\n📄 PASO 2: Generando scripts por idioma...");
+  const scripts = new Map<string, { script: Script; scriptDbId: string }>();
   const uniqueLanguages = [...new Set(channels.map((ch) => ch.language))];
 
   for (const language of uniqueLanguages) {
-    // Usar el primer canal de este idioma para obtener los prompts
-    const channelForLang = channels.find((ch) => ch.language === language)!;
-    const topicPrompts = await getChannelPrompts(channelForLang.id, "topic");
-
-    const topic = await generateTopic(
-      language as "es" | "en",
-      channelForLang.id,
-    );
-    Logger.success(`Topic (${language.toUpperCase()}): "${topic.title}"`);
-
-    await saveTopic({ ...topic, execution_id: executionId });
-    topics.set(language, topic);
-  }
-
-  // PASO 2: Generar Scripts por idioma (uno por idioma único)
-  Logger.info("\n📄 PASO 2: Generando scripts...");
-  const scripts = new Map<string, { script: Script; scriptDbId: string }>();
-
-  for (const language of uniqueLanguages) {
-    // Obtener el topic del idioma correspondiente
-    const topic = topics.get(language);
-    if (!topic) {
-      throw new Error(`No se encontró topic para el idioma: ${language}`);
-    }
-
     // Usar el primer canal de este idioma para obtener el prompt
     const channelForLang = channels.find((ch) => ch.language === language)!;
     const scriptPrompts = await getChannelPrompts(channelForLang.id, "script");
 
+    // IMPORTANTE: Mismo topic para todos los idiomas
+    // El prompt de script debe manejar la traducción/adaptación al idioma target
     const script = await generateScriptWithPrompt(
       topic,
       language as "es" | "en",

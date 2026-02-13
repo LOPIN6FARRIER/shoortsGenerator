@@ -275,10 +275,22 @@ export async function generateScriptWithPrompt(
     Logger.info(`\n📋 GENERANDO SCRIPT PARA TOPIC:`);
     Logger.info(`   Title: "${topic.title}"`);
     Logger.info(`   Description: "${topic.description.substring(0, 150)}..."`);
+    Logger.info(`   Target language: ${language.toUpperCase()}`);
     
-    const prompt = customPrompt
+    let prompt = customPrompt
       .replace(/\$\{topic\.title\}/g, topic.title)
       .replace(/\$\{topic\.description\}/g, topic.description);
+
+    // 🌐 AUTO-TRADUCCIÓN: Si el idioma target es diferente, agregar instrucciones
+    const languageName = language === "es" ? "español" : "English";
+    const translationNote = `
+🌐 IMPORTANT LANGUAGE INSTRUCTION:
+The script must be ENTIRELY in ${languageName.toUpperCase()}.
+If the topic title or description is in another language, translate and adapt the content naturally to ${languageName}.
+The final script must sound native in ${languageName}, not like a translation.
+`;
+    
+    prompt = translationNote + "\n" + prompt;
 
     Logger.info(`\n📝 PROMPT DESPUÉS DE REEMPLAZAR VARIABLES:`);
     Logger.info(prompt.substring(0, 500) + "...\n");
