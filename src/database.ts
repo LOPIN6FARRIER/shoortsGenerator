@@ -685,3 +685,38 @@ export async function getChannelPrompts(
   const result = await db.query<PromptConfig>(query, params);
   return result.rows;
 }
+
+/**
+ * Actualiza los tokens de YouTube de un canal
+ */
+export async function updateChannelTokens(
+  channelId: string,
+  tokens: {
+    access_token: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    token_type?: string;
+    scope?: string;
+  },
+): Promise<void> {
+  const db = getDatabase();
+  await db.query(
+    `UPDATE channels 
+     SET youtube_access_token = $1,
+         youtube_refresh_token = COALESCE($2, youtube_refresh_token),
+         youtube_token_expiry = $3,
+         youtube_token_type = $4,
+         youtube_scope = $5,
+         updated_at = NOW()
+     WHERE id = $6`,
+    [
+      tokens.access_token,
+      tokens.refresh_token || null,
+      tokens.expiry_date || null,
+      tokens.token_type || "Bearer",
+      tokens.scope || null,
+      channelId,
+    ],
+  );
+  Logger.info(`Tokens de YouTube actualizados para canal ${channelId}`);
+}

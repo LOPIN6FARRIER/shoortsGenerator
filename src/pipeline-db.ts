@@ -370,6 +370,7 @@ async function processChannelGroup(
           legacyChannelConfig,
           tokens,
           channel.upload_as_short,
+          channel.id, // Para actualizar tokens si se refrescan
         );
 
         await saveYouTubeUpload({

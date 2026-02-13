@@ -27,6 +27,7 @@ export async function uploadToYouTube(
     scope?: string;
   },
   uploadAsShort: boolean = true,
+  channelId?: string,
 ): Promise<UploadResult> {
   const videoType = uploadAsShort ? "Short" : "video";
   Logger.info(
@@ -44,6 +45,37 @@ export async function uploadToYouTube(
     // Si se pasaron tokens directamente (desde BD), usarlos
     if (tokens && tokens.access_token) {
       oauth2Client.setCredentials(tokens);
+
+      // Verificar si el token está expirado o por expirar (margen de 5 minutos)
+      const now = Date.now();
+      const tokenExpiry = tokens.expiry_date || 0;
+      const isExpired = tokenExpiry > 0 && now >= tokenExpiry - 5 * 60 * 1000;
+
+      if (isExpired && tokens.refresh_token) {
+        Logger.info("Token de YouTube expirado, refrescando automáticamente...");
+        try {
+          const { credentials } = await oauth2Client.refreshAccessToken();
+          oauth2Client.setCredentials(credentials);
+
+          // Actualizar tokens en BD si tenemos channelId
+          if (channelId && credentials.access_token) {
+            const { updateChannelTokens } = await import("./database.js");
+            await updateChannelTokens(channelId, {
+              access_token: credentials.access_token,
+              refresh_token: credentials.refresh_token || undefined,
+              expiry_date: credentials.expiry_date || undefined,
+              token_type: credentials.token_type || undefined,
+              scope: credentials.scope || undefined,
+            });
+            Logger.success("✅ Token de YouTube refrescado y guardado en BD");
+          }
+        } catch (refreshError: any) {
+          Logger.error("Error refrescando token:", refreshError.message);
+          throw new Error(
+            `Token expirado y no se pudo refrescar: ${refreshError.message}. Vuelve a autenticar el canal con: npm run auth`,
+          );
+        }
+      }
     } else {
       // Cargar credenciales desde archivo (flujo legacy)
       if (!existsSync(channelConfig.youtubeCredentialsPath)) {
@@ -103,6 +135,121 @@ export async function uploadToYouTube(
   } catch (error: any) {
     Logger.error("Error subiendo a YouTube:", error.message);
     throw new Error(`Error en upload: ${error.message}`);
+  }
+}
+
+/**
+ * Refresca tokens de YouTube para un canal si están por expirar
+ * @returns true si se refrescaron, false si no era necesario o falló
+ */
+export async function refreshChannelTokensIfNeeded(
+  channelId: string,
+  channelConfig: ChannelConfig,
+  tokens: {
+    access_token: string;
+    refresh_token?: string;
+    expiry_date?: number;
+    token_type?: string;
+    scope?: string;
+  },
+): Promise<boolean> {
+  try {
+    // Verificar si el token está por expirar (margen de 24 horas)
+    const now = Date.now();
+    const tokenExpiry = tokens.expiry_date || 0;
+    const expiresIn24Hours = tokenExpiry > 0 && now >= tokenExpiry - 24 * 60 * 60 * 1000;
+
+    if (!expiresIn24Hours) {
+      return false; // No necesita refresh todavía
+    }
+
+    if (!tokens.refresh_token) {
+      Logger.warn(`Canal ${channelId} no tiene refresh_token, necesita re-autenticación`);
+      return false;
+    }
+
+    Logger.info(`Refrescando tokens de YouTube para canal ${channelId}...`);
+
+    const oauth2Client = new google.auth.OAuth2(
+      channelConfig.youtubeClientId,
+      channelConfig.youtubeClientSecret,
+      channelConfig.youtubeRedirectUri,
+    );
+
+    oauth2Client.setCredentials(tokens);
+    const { credentials } = await oauth2Client.refreshAccessToken();
+
+    if (credentials.access_token) {
+      const { updateChannelTokens } = await import("./database.js");
+      await updateChannelTokens(channelId, {
+        access_token: credentials.access_token,
+        refresh_token: credentials.refresh_token || undefined,
+        expiry_date: credentials.expiry_date || undefined,
+        token_type: credentials.token_type || undefined,
+        scope: credentials.scope || undefined,
+      });
+      Logger.success(`✅ Tokens refrescados para canal ${channelId}`);
+      return true;
+    }
+
+    return false;
+  } catch (error: any) {
+    Logger.error(`Error refrescando tokens para canal ${channelId}:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Refresca tokens de todos los canales activos que estén por expirar
+ */
+export async function refreshAllChannelTokens(): Promise<void> {
+  try {
+    const { getActiveChannels } = await import("./database.js");
+    const channels = await getActiveChannels();
+
+    let refreshedCount = 0;
+    let checkedCount = 0;
+
+    for (const channel of channels) {
+      // Solo procesar canales con tokens
+      if (!channel.youtube_access_token) {
+        continue;
+      }
+
+      checkedCount++;
+
+      const channelConfig = {
+        language: channel.language,
+        youtubeClientId: channel.youtube_client_id || "",
+        youtubeClientSecret: channel.youtube_client_secret || "",
+        youtubeRedirectUri: channel.youtube_redirect_uri || "",
+        youtubeCredentialsPath: "",
+      } as any;
+
+      const tokens = {
+        access_token: channel.youtube_access_token,
+        refresh_token: channel.youtube_refresh_token || undefined,
+        expiry_date: channel.youtube_token_expiry || undefined,
+        token_type: channel.youtube_token_type || "Bearer",
+        scope: channel.youtube_scope || undefined,
+      };
+
+      const refreshed = await refreshChannelTokensIfNeeded(
+        channel.id,
+        channelConfig,
+        tokens,
+      );
+
+      if (refreshed) {
+        refreshedCount++;
+      }
+    }
+
+    Logger.info(
+      `✅ Job de refresh de tokens completado: ${refreshedCount}/${checkedCount} canales refrescados`,
+    );
+  } catch (error: any) {
+    Logger.error("Error en job de refresh de tokens:", error.message);
   }
 }
 

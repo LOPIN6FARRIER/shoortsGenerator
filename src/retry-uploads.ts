@@ -129,6 +129,7 @@ export async function retryPendingUploads(): Promise<void> {
           legacyChannelConfig,
           tokens,
           channel.upload_as_short,
+          channel.id, // Para actualizar tokens si se refrescan
         );
 
         // Guardar registro de upload

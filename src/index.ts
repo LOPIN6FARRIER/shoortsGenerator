@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { CronExpressionParser } from "cron-parser";
 import { executePipelineFromDB } from "./pipeline-db.js";
 import { retryPendingUploads } from "./retry-uploads.js";
+import { refreshAllChannelTokens } from "./upload.js";
 import { Logger } from "./utils.js";
 import { initDatabase, getPool, getActiveChannels } from "./database.js";
 import app from "./api-app.js";
@@ -14,7 +15,7 @@ export { generateScript, generateBilingualScripts } from "./script.js";
 export { generateTTS, checkEdgeTTS } from "./tts.js";
 export { generateShortsOptimizedSRT } from "./subtitles.js";
 export { generateVideo, checkFFmpeg } from "./video.js";
-export { uploadToYouTube, checkCredentials } from "./upload.js";
+export { uploadToYouTube, checkCredentials, refreshAllChannelTokens } from "./upload.js";
 export { CONFIG } from "./config.js";
 export { Logger } from "./utils.js";
 
@@ -184,8 +185,18 @@ if (process.env.RUN_ONCE === "true") {
       await retryPendingUploads();
     });
 
+    // Cron de refresh de tokens: cada 6 horas
+    const CRON_TOKEN_REFRESH = "0 */6 * * *"; // Cada 6 horas
+    cron.schedule(CRON_TOKEN_REFRESH, async () => {
+      Logger.info("🔑 Ejecutando job de refresh de tokens YouTube...");
+      await refreshAllChannelTokens();
+    });
+
     Logger.info(
       `🔄 Job de reintentos configurado: cada 2 horas (${CRON_RETRY_INTERVAL})`,
+    );
+    Logger.info(
+      `🔑 Job de refresh de tokens configurado: cada 6 horas (${CRON_TOKEN_REFRESH})`,
     );
   }
 
