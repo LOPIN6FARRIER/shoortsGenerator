@@ -329,6 +329,7 @@ async function processChannelGroup(
     const videoDbId = await saveVideo({
       script_id: scriptDbId,
       language: channel.language as "es" | "en",
+      channel_id: channel.id, // 🔧 Asociar video con su canal específico
       file_path: videoResult.videoPath,
       duration_seconds: Math.round(videoResult.duration),
       width: videoResult.width,

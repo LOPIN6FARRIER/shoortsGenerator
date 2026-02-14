@@ -34,6 +34,7 @@ export interface DBVideo {
   id?: string;
   script_id: string;
   language: "es" | "en";
+  channel_id?: string; // 🔧 Canal específico al que pertenece este video
   file_path: string;
   duration_seconds: number;
   width: number;
@@ -313,12 +314,13 @@ export async function saveScript(script: DBScript): Promise<string> {
 export async function saveVideo(video: DBVideo): Promise<string> {
   const db = getDatabase();
   const result = await db.query<{ id: string }>(
-    `INSERT INTO videos (script_id, language, file_path, duration_seconds, width, height, file_size_mb, audio_voice, audio_file_path, subtitles_file_path, processing_time_seconds)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO videos (script_id, language, channel_id, file_path, duration_seconds, width, height, file_size_mb, audio_voice, audio_file_path, subtitles_file_path, processing_time_seconds)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id`,
     [
       video.script_id,
       video.language,
+      video.channel_id, // 🔧 Ahora guardamos el canal específico
       video.file_path,
       video.duration_seconds,
       video.width,
@@ -331,7 +333,7 @@ export async function saveVideo(video: DBVideo): Promise<string> {
     ],
   );
   const videoId = result.rows[0].id;
-  Logger.info(`Video guardado en BD: ${videoId}`);
+  Logger.info(`Video guardado en BD: ${videoId} (canal: ${video.channel_id})`);
   return videoId;
 }
 
@@ -608,7 +610,7 @@ export async function getPendingUploadVideos(): Promise<
        c.name as channel_name
      FROM videos v
      INNER JOIN scripts s ON v.script_id = s.id
-     INNER JOIN channels c ON s.language::TEXT = c.language AND c.enabled = true
+     INNER JOIN channels c ON v.channel_id = c.id AND c.enabled = true  -- 🔧 JOIN por channel_id específico
      WHERE (
        -- Videos 'failed' se reintentan inmediatamente
        (v.upload_status = 'failed')
@@ -620,6 +622,7 @@ export async function getPendingUploadVideos(): Promise<
      )
        AND COALESCE(v.upload_attempts, 0) < 5
        AND c.youtube_access_token IS NOT NULL
+       AND v.channel_id IS NOT NULL  -- 🔧 Solo videos con canal asignado
      ORDER BY v.last_upload_attempt_at ASC NULLS FIRST
      LIMIT 50`,
   );
