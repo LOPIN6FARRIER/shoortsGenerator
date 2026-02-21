@@ -1,9 +1,10 @@
-import { Pool } from "pg";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Logger } from "../../utils.js";
+import type { DBPool } from "../../database.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "24h";
 const REFRESH_TOKEN_EXPIRES_DAYS = 30;
 
@@ -33,7 +34,7 @@ export interface TokenPayload {
 }
 
 export class AuthService {
-  constructor(private pool: Pool) {}
+  constructor(private pool: DBPool) {}
 
   /**
    * Authenticate user with email and password
@@ -54,7 +55,15 @@ export class AuthService {
       );
 
       if (userResult.rows.length === 0) {
-        await this.logAuthEvent(null, "failed_login", email, ipAddress, userAgent, false, "User not found");
+        await this.logAuthEvent(
+          null,
+          "failed_login",
+          email,
+          ipAddress,
+          userAgent,
+          false,
+          "User not found",
+        );
         return { success: false, error: "Invalid credentials" };
       }
 
@@ -62,15 +71,34 @@ export class AuthService {
 
       // Check if user is active
       if (!user.is_active) {
-        await this.logAuthEvent(user.id, "failed_login", email, ipAddress, userAgent, false, "Account inactive");
+        await this.logAuthEvent(
+          user.id,
+          "failed_login",
+          email,
+          ipAddress,
+          userAgent,
+          false,
+          "Account inactive",
+        );
         return { success: false, error: "Account is inactive" };
       }
 
       // Verify password
-      const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-      
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        user.password_hash,
+      );
+
       if (!isPasswordValid) {
-        await this.logAuthEvent(user.id, "failed_login", email, ipAddress, userAgent, false, "Invalid password");
+        await this.logAuthEvent(
+          user.id,
+          "failed_login",
+          email,
+          ipAddress,
+          userAgent,
+          false,
+          "Invalid password",
+        );
         return { success: false, error: "Invalid credentials" };
       }
 
@@ -94,7 +122,14 @@ export class AuthService {
       );
 
       // Log successful login
-      await this.logAuthEvent(user.id, "login", email, ipAddress, userAgent, true);
+      await this.logAuthEvent(
+        user.id,
+        "login",
+        email,
+        ipAddress,
+        userAgent,
+        true,
+      );
 
       // Remove password_hash from response
       const { password_hash, ...userWithoutPassword } = user;
@@ -109,7 +144,15 @@ export class AuthService {
       };
     } catch (error: any) {
       Logger.error("❌ Login error:", error.message);
-      await this.logAuthEvent(null, "failed_login", email, ipAddress, userAgent, false, error.message);
+      await this.logAuthEvent(
+        null,
+        "failed_login",
+        email,
+        ipAddress,
+        userAgent,
+        false,
+        error.message,
+      );
       return { success: false, error: "Login failed" };
     }
   }
@@ -180,7 +223,14 @@ export class AuthService {
       // Create new session
       await this.createSession(user.user_id, newToken);
 
-      await this.logAuthEvent(user.user_id, "token_refresh", user.email, undefined, undefined, true);
+      await this.logAuthEvent(
+        user.user_id,
+        "token_refresh",
+        user.email,
+        undefined,
+        undefined,
+        true,
+      );
 
       return {
         success: true,
@@ -212,7 +262,14 @@ export class AuthService {
       );
 
       if (result.rows.length > 0) {
-        await this.logAuthEvent(result.rows[0].user_id, "logout", undefined, undefined, undefined, true);
+        await this.logAuthEvent(
+          result.rows[0].user_id,
+          "logout",
+          undefined,
+          undefined,
+          undefined,
+          true,
+        );
         Logger.info(`✅ User logged out`);
         return true;
       }
@@ -256,7 +313,11 @@ export class AuthService {
   /**
    * Change user password
    */
-  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<boolean> {
+  async changePassword(
+    userId: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<boolean> {
     try {
       // Get current password hash
       const userResult = await this.pool.query(
@@ -269,7 +330,10 @@ export class AuthService {
       }
 
       // Verify old password
-      const isValid = await bcrypt.compare(oldPassword, userResult.rows[0].password_hash);
+      const isValid = await bcrypt.compare(
+        oldPassword,
+        userResult.rows[0].password_hash,
+      );
       if (!isValid) {
         return false;
       }
@@ -284,7 +348,9 @@ export class AuthService {
       );
 
       // Invalidate all sessions
-      await this.pool.query("DELETE FROM sessions WHERE user_id = $1", [userId]);
+      await this.pool.query("DELETE FROM sessions WHERE user_id = $1", [
+        userId,
+      ]);
 
       Logger.info(`✅ Password changed for user: ${userId}`);
       return true;
@@ -298,7 +364,9 @@ export class AuthService {
    * Generate JWT token
    */
   private generateToken(payload: TokenPayload): string {
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    } as jwt.SignOptions);
   }
 
   /**
@@ -324,8 +392,10 @@ export class AuthService {
    * Create refresh token
    */
   private async createRefreshToken(userId: string): Promise<string> {
-    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: `${REFRESH_TOKEN_EXPIRES_DAYS}d` } as jwt.SignOptions);
-    
+    const token = jwt.sign({ userId }, JWT_SECRET, {
+      expiresIn: `${REFRESH_TOKEN_EXPIRES_DAYS}d`,
+    } as jwt.SignOptions);
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRES_DAYS);
 
@@ -366,11 +436,19 @@ export class AuthService {
    */
   async cleanExpiredTokens(): Promise<void> {
     try {
-      const sessionsResult = await this.pool.query("SELECT clean_expired_sessions()");
-      const tokensResult = await this.pool.query("SELECT clean_expired_refresh_tokens()");
-      
-      Logger.info(`🧹 Cleaned ${sessionsResult.rows[0].clean_expired_sessions} expired sessions`);
-      Logger.info(`🧹 Cleaned ${tokensResult.rows[0].clean_expired_refresh_tokens} expired refresh tokens`);
+      const sessionsResult = await this.pool.query(
+        "SELECT clean_expired_sessions()",
+      );
+      const tokensResult = await this.pool.query(
+        "SELECT clean_expired_refresh_tokens()",
+      );
+
+      Logger.info(
+        `🧹 Cleaned ${sessionsResult.rows[0].clean_expired_sessions} expired sessions`,
+      );
+      Logger.info(
+        `🧹 Cleaned ${tokensResult.rows[0].clean_expired_refresh_tokens} expired refresh tokens`,
+      );
     } catch (error: any) {
       Logger.error("❌ Error cleaning expired tokens:", error.message);
     }

@@ -23,7 +23,7 @@ export async function generateScript(
   Logger.info(`Generando guion con IA para: ${topic.id} (${language})`);
 
   const provider = await getLLMClient();
-  const client = provider.client;
+  const client = provider.client as any;
   const model = getModel(provider);
   const channelConfig = getChannelConfig(language);
   const languageName =
@@ -284,7 +284,7 @@ export async function generateScriptWithPrompt(
   Logger.info(`Generando script con prompt personalizado (${language})`);
 
   const provider = await getLLMClient();
-  const client = provider.client;
+  const client = provider.client as any;
   const model = getModel(provider);
 
   try {
@@ -328,7 +328,7 @@ The final script must sound native in ${languageName}, not like a translation.
 7. Do NOT copy the example values - create content specific to the topic
 8. Do NOT wrap in markdown code blocks
 
-✅ VALID FORMAT (create your own relevant content):
+✅ VALID FORMAT  (create your own relevant content, dont copy exactly the example):
 {"title": "Your Actual Title Here", "narrative": "Your actual narrative content that stays on one continuous line without breaks", "description": "Your actual description", "tags": ["relevant", "keywords", "for", "this", "topic"], "estimated_duration": 47}
 
 ❌ INVALID (DO NOT copy example literally):
@@ -390,12 +390,12 @@ Return ONLY the raw JSON object NOW:`;
       );
       try {
         let cleanedJson = jsonString;
-        
+
         // 1. Reemplazar saltos de línea literales dentro de valores por espacios
         // Buscar patrones como: "key":"value con\nsalto de línea"
         cleanedJson = cleanedJson.replace(
           /:\s*"([^"]*)"/gs,
-          (match, content) => {
+          (match: any, content: string) => {
             // Reemplazar \n literales por espacio en valores
             const cleaned = content
               .replace(/\n/g, " ")
@@ -405,16 +405,16 @@ Return ONLY the raw JSON object NOW:`;
             return `: "${cleaned}"`;
           },
         );
-        
+
         // 2. Corregir tags si está como string en lugar de array
         // Cambia "tags":"["tag1","tag2"]" a "tags":["tag1","tag2"]
         cleanedJson = cleanedJson.replace(
           /"tags"\s*:\s*"(\[[^\]]+\])"/g,
-          (match, content) => {
+          (match: any, content: any) => {
             return `"tags":${content}`;
           },
         );
-        
+
         parsed = JSON.parse(cleanedJson);
         Logger.success("✅ JSON parseado exitosamente después de limpieza");
       } catch (secondError: any) {
@@ -430,6 +430,25 @@ Return ONLY the raw JSON object NOW:`;
     const wordCount = narrative.split(/\s+/).length;
     const estimatedDuration =
       parsed.estimated_duration || Math.round(wordCount / 2.5);
+
+    // 🔧 VALIDACIÓN DE LONGITUD: Detectar si el prompt pide un mínimo de palabras
+    const minWordsMatch = customPrompt.match(
+      /(?:mínimo|minimum|min|entre|between)\s*(\d{3,4})/i,
+    );
+    const minWordsRequired = minWordsMatch ? parseInt(minWordsMatch[1]) : 0;
+
+    if (minWordsRequired > 0 && wordCount < minWordsRequired * 0.7) {
+      // Si el script tiene menos del 70% de palabras requeridas, advertir
+      Logger.warn(
+        `⚠️  Script muy corto: ${wordCount} palabras (se pedían ~${minWordsRequired})`,
+      );
+      Logger.warn(
+        `   El modelo ${model} puede tener dificultades con scripts largos.`,
+      );
+      Logger.warn(
+        `   💡 Consejo: Ajusta el prompt o genera por partes para mejor resultado.`,
+      );
+    }
 
     // Generar tags dinámicos basados en el topic si el modelo no los proporciona
     const dynamicTags = [
@@ -461,50 +480,4 @@ Return ONLY the raw JSON object NOW:`;
     );
     throw error;
   }
-}
-
-export async function generateBilingualScripts(
-  topic: Topic,
-): Promise<{ es: Script; en: Script }> {
-  Logger.info("Generando scripts bilingües con IA...");
-
-  // 🔍 MODO DEBUGGING: Intentar reutilizar últimos scripts de BD por idioma
-  if (process.env.DEBUGGING === "true") {
-    Logger.info("🔍 DEBUGGING mode: Buscando últimos scripts en BD...");
-
-    const [latestScriptES, latestScriptEN] = await Promise.all([
-      getLatestScriptByLanguage("es"),
-      getLatestScriptByLanguage("en"),
-    ]);
-
-    // Si ambos existen, reutilizarlos
-    if (latestScriptES && latestScriptEN) {
-      Logger.warn(
-        `♻️  Reutilizando scripts existentes: ES="${latestScriptES.title}", EN="${latestScriptEN.title}"`,
-      );
-      latestScriptES.topic = topic;
-      latestScriptEN.topic = topic;
-      return {
-        es: latestScriptES as Script,
-        en: latestScriptEN as Script,
-      };
-    }
-
-    // Si solo existe uno, generarlo todo nuevo para consistencia
-    if (latestScriptES || latestScriptEN) {
-      Logger.warn(
-        "⚠️  Solo existe script en un idioma, generando ambos nuevos para consistencia...",
-      );
-    } else {
-      Logger.info("📝 No hay scripts en BD, generando nuevos con IA...");
-    }
-    // Continuar con generación normal
-  }
-
-  const [es, en] = await Promise.all([
-    generateScript(topic, "es"),
-    generateScript(topic, "en"),
-  ]);
-
-  return { es, en };
 }

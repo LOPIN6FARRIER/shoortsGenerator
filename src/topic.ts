@@ -45,30 +45,7 @@ export async function generateTopic(
   }
 
   // Cargar prompt desde BD si se proporciona channelId
-  let prompt = `You are a creative researcher.
-Generate ONE original topic for a short micro-documentary.
-
-Rules:
-- It must be something most people never think about.
-- It must be concrete (object, process, habit, small detail).
-- Avoid famous people.
-- Avoid generic trivia.
-- Avoid clickbait.
-- Calm, curious, thoughtful tone.
-
-CRITICAL: Return ONLY valid JSON, nothing else. No explanations, no markdown, no extra text.
-
-JSON format (create unique content, do NOT copy examples):
-{
-  "id": "your-topic-id-here",
-  "title": "Your Unique Topic Title",
-  "description": "Your detailed description of the topic",
-  "imageKeywords": "2-3 simple search keywords in English (format examples: 'library books' or 'coffee shop' or 'parking lot' - but use keywords relevant to YOUR topic)",
-  "videoKeywords": "2-3 action keywords in English for video search (format examples: 'workers painting' or 'people walking' - but use keywords relevant to YOUR topic)"
-}
-
-⚠️ IMPORTANT: The example keywords shown are FORMAT GUIDES only. Generate NEW keywords specific to your generated topic!`;
-
+  let prompt = "";
   if (channelId) {
     const { getChannelPrompts } = await import("./database.js");
     const prompts = await getChannelPrompts(channelId, "topic");
@@ -84,7 +61,7 @@ JSON format (create unique content, do NOT copy examples):
     const topicsList = recentTopics
       .map((t, i) => `${i + 1}. "${t.title}"`)
       .join("\n");
-    
+
     const avoidRepetitionNote = `
 
 🚫 AVOID REPETITION - Recently used topics (DO NOT generate similar topics):
@@ -93,29 +70,29 @@ ${topicsList}
 ⚠️ Your new topic MUST be COMPLETELY DIFFERENT from all the topics listed above.
 Generate a fresh, unique topic that hasn't been covered yet.
 `;
-    
+
     prompt = prompt + avoidRepetitionNote;
-    Logger.info(`🔍 Evitando repetición de ${recentTopics.length} topics recientes`);
+    Logger.info(
+      `🔍 Evitando repetición de ${recentTopics.length} topics recientes`,
+    );
   }
 
   try {
     Logger.info("Generando topic con IA...");
 
     const provider = await getLLMClient();
-    const client = provider.client;
+    const client = provider.client as any;
     const model = getModel(provider);
 
-    // 🎛️ Ajustar temperatura según provider
-    // Ollama necesita temperatura más baja para seguir instrucciones JSON
     const temperature = provider.name === "ollama" ? 0.7 : 0.9;
 
-    const response = await client.chat.completions.create({
+    const requestOptions: any = {
       model: model,
       messages: [
         {
           role: "system",
           content:
-            "You are a creative researcher specializing in fascinating micro-documentary topics.",
+            "You are a creative researcher specializing in fascinating micro-documentary topics. Always respond with valid JSON only.",
         },
         {
           role: "user",
@@ -124,16 +101,18 @@ Generate a fresh, unique topic that hasn't been covered yet.
       ],
       temperature: temperature,
       response_format: { type: "json_object" },
-      frequency_penalty: 0.7, // Penalizar palabras repetidas (aumentado para evitar topics similares)
-      presence_penalty: 0.5, // Penalizar temas repetidos (aumentado para mayor originalidad)
-    });
+      frequency_penalty: 0.7,
+      presence_penalty: 0.5,
+    };
+
+    const response = await client.chat.completions.create(requestOptions);
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
       throw new Error("La IA no devolvió contenido");
     }
 
-    // 🔧 PARSING ROBUSTO: Ollama puede devolver texto extra antes/después del JSON
+    // 🔧 PARSING ROBUSTO: Puede devolver texto extra antes/después del JSON
     let parsed;
     try {
       // Intentar parsear directo primero

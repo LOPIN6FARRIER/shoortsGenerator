@@ -1,4 +1,4 @@
-import { getPool, pool } from "../../database.js";
+import { getPool } from "../../database.js";
 import {
   createSuccessResult,
   createErrorResult,

@@ -1,6 +1,6 @@
 {
   "name": "youtube-shorts-bilingual-generator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Generador automático de YouTube Shorts en español e inglés",
   "type": "module",
   "main": "dist/index.js",
@@ -36,12 +36,14 @@
     "express": "^4.18.2",
     "googleapis": "^134.0.0",
     "jsonwebtoken": "^9.0.3",
-    "katax-core": "^1.0.0",
+    "katax-core": "^1.5.3",
+    "katax-service-manager": "^0.3.4",
     "node-cron": "^4.2.1",
     "openai": "^4.67.0",
     "pg": "^8.18.0",
     "pino": "^10.3.0",
-    "pino-pretty": "^13.1.3"
+    "pino-pretty": "^13.1.3",
+    "redis": "^5.11.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

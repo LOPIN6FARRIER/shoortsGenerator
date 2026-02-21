@@ -8,7 +8,7 @@ const PORT = process.env.API_PORT || 3001;
 async function startAPI() {
   try {
     // Initialize database and test connection
-    initDatabase();
+    await initDatabase();
     const pool = getPool();
     await pool.query("SELECT NOW();");
     Logger.success("✅ Conexión a PostgreSQL establecida");

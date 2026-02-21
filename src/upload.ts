@@ -6,6 +6,13 @@ import { Script } from "./script.js";
 
 const youtube = google.youtube("v3");
 
+function getReauthHint(channelId?: string): string {
+  if (channelId) {
+    return `Re-autentica el canal via endpoint: GET /api/youtube-auth/${channelId}/auth-url y luego completa callback/manual-code.`;
+  }
+  return "Re-autentica el canal via endpoints de YouTube Auth (/api/youtube-auth/:channelId/auth-url y callback/manual-code).";
+}
+
 export interface UploadResult {
   videoId: string;
   url: string;
@@ -52,7 +59,9 @@ export async function uploadToYouTube(
       const isExpired = tokenExpiry > 0 && now >= tokenExpiry - 5 * 60 * 1000;
 
       if (isExpired && tokens.refresh_token) {
-        Logger.info("Token de YouTube expirado, refrescando automáticamente...");
+        Logger.info(
+          "Token de YouTube expirado, refrescando automáticamente...",
+        );
         try {
           const { credentials } = await oauth2Client.refreshAccessToken();
           oauth2Client.setCredentials(credentials);
@@ -72,7 +81,7 @@ export async function uploadToYouTube(
         } catch (refreshError: any) {
           Logger.error("Error refrescando token:", refreshError.message);
           throw new Error(
-            `Token expirado y no se pudo refrescar: ${refreshError.message}. Vuelve a autenticar el canal con: npm run auth`,
+            `Token expirado y no se pudo refrescar: ${refreshError.message}. ${getReauthHint(channelId)}`,
           );
         }
       }
@@ -81,7 +90,7 @@ export async function uploadToYouTube(
       if (!existsSync(channelConfig.youtubeCredentialsPath)) {
         throw new Error(
           `Credenciales no encontradas en: ${channelConfig.youtubeCredentialsPath}\n` +
-            "Ejecuta el flujo de autenticación primero con: npm run auth",
+            `${getReauthHint(channelId)}`,
         );
       }
 
@@ -92,7 +101,7 @@ export async function uploadToYouTube(
     }
 
     // Preparar metadata del video
-    const description = uploadAsShort 
+    const description = uploadAsShort
       ? script.description + "\n\n#Shorts"
       : script.description;
 
@@ -157,14 +166,26 @@ export async function refreshChannelTokensIfNeeded(
     // Verificar si el token está por expirar (margen de 24 horas)
     const now = Date.now();
     const tokenExpiry = tokens.expiry_date || 0;
-    const expiresIn24Hours = tokenExpiry > 0 && now >= tokenExpiry - 24 * 60 * 60 * 1000;
+    const shouldRefresh =
+      tokenExpiry <= 0 || now >= tokenExpiry - 24 * 60 * 60 * 1000;
 
-    if (!expiresIn24Hours) {
+    if (!shouldRefresh) {
+      Logger.debug(
+        `Canal ${channelId}: token aún vigente, no requiere refresh (expira en ${new Date(tokenExpiry).toISOString()})`,
+      );
       return false; // No necesita refresh todavía
     }
 
+    if (tokenExpiry <= 0) {
+      Logger.warn(
+        `Canal ${channelId}: token sin expiry_date, intentando refresh preventivo`,
+      );
+    }
+
     if (!tokens.refresh_token) {
-      Logger.warn(`Canal ${channelId} no tiene refresh_token, necesita re-autenticación`);
+      Logger.warn(
+        `Canal ${channelId} no tiene refresh_token. ${getReauthHint(channelId)}`,
+      );
       return false;
     }
 
@@ -192,9 +213,26 @@ export async function refreshChannelTokensIfNeeded(
       return true;
     }
 
+    Logger.warn(
+      `Canal ${channelId}: refresh ejecutado pero sin access_token nuevo en respuesta`,
+    );
+
     return false;
   } catch (error: any) {
-    Logger.error(`Error refrescando tokens para canal ${channelId}:`, error.message);
+    if (
+      typeof error?.message === "string" &&
+      error.message.includes("invalid_grant")
+    ) {
+      Logger.error(
+        `Error refrescando tokens para canal ${channelId}: invalid_grant. ${getReauthHint(channelId)}`,
+      );
+      return false;
+    }
+
+    Logger.error(
+      `Error refrescando tokens para canal ${channelId}:`,
+      error.message,
+    );
     return false;
   }
 }
@@ -209,6 +247,7 @@ export async function refreshAllChannelTokens(): Promise<void> {
 
     let refreshedCount = 0;
     let checkedCount = 0;
+    let missingRefreshTokenCount = 0;
 
     for (const channel of channels) {
       // Solo procesar canales con tokens
@@ -217,6 +256,10 @@ export async function refreshAllChannelTokens(): Promise<void> {
       }
 
       checkedCount++;
+
+      if (!channel.youtube_refresh_token) {
+        missingRefreshTokenCount++;
+      }
 
       const channelConfig = {
         language: channel.language,
@@ -246,7 +289,7 @@ export async function refreshAllChannelTokens(): Promise<void> {
     }
 
     Logger.info(
-      `✅ Job de refresh de tokens completado: ${refreshedCount}/${checkedCount} canales refrescados`,
+      `✅ Job de refresh de tokens completado: ${refreshedCount}/${checkedCount} canales refrescados (${missingRefreshTokenCount} sin refresh_token)`,
     );
   } catch (error: any) {
     Logger.error("Error en job de refresh de tokens:", error.message);

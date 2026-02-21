@@ -26,7 +26,7 @@ export async function retryPendingUploads(): Promise<void> {
   Logger.info("");
 
   try {
-    initDatabase();
+    await initDatabase();
 
     const pendingVideos = await getPendingUploadVideos();
 
@@ -158,11 +158,48 @@ export async function retryPendingUploads(): Promise<void> {
           error.message.includes("exceeded the number of videos") ||
           error.message.includes("quota");
 
+        // Verificar si es error de autenticación (token inválido/revocado)
+        const isAuthError =
+          error.message.includes("invalid_grant") ||
+          error.message.includes("Token expirado y no se pudo refrescar") ||
+          error.message.includes("Vuelve a autenticar");
+
         if (isQuotaError) {
           Logger.warn(
             "⚠️  Límite de cuota alcanzado. Deteniendo reintentos en este lote.",
           );
           quotaLimitReached = true;
+        }
+
+        if (isAuthError) {
+          Logger.error(
+            `🔐 Error de autenticación en canal ${video.channel_name}.`,
+          );
+          Logger.error(`   El token ha expirado o fue revocado.`);
+          Logger.error(
+            `   ➡️  Re-autentica el canal desde el dashboard para resolver.`,
+          );
+          // Marcar con flag especial para no reintentar más
+          await markVideoUploadFailed(
+            video.id!,
+            `AUTH_REQUIRED: ${error.message}`,
+            false, // No es error de cuota
+          );
+
+          // Registrar error específico de autenticación
+          await logError({
+            error_type: "auth_token_invalid",
+            error_message: error.message,
+            context: {
+              video_id: video.id,
+              channel_id: video.channel_id,
+              channel_name: video.channel_name,
+              requires_reauth: true,
+            },
+          });
+
+          failCount++;
+          continue; // Saltar al siguiente video
         }
 
         // Marcar como fallido

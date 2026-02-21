@@ -1,4 +1,4 @@
-import { Pool, QueryResult } from "pg";
+import { katax } from "katax-service-manager";
 import { Logger } from "./utils.js";
 import { Topic } from "./topic.js";
 import { Script } from "./script.js";
@@ -96,9 +96,82 @@ export interface DBTopicImage {
 // CONEXIÓN A BASE DE DATOS
 // ============================================
 
-let pool: Pool | null = null;
+export interface QueryResult<T = any> {
+  rows: T[];
+  rowCount: number;
+}
 
-export function getPool(): Pool {
+export interface DatabaseClient {
+  query<T = any>(sql: string, params?: unknown[]): Promise<QueryResult<T>>;
+  release(): void;
+}
+
+export interface DBPool {
+  query<T = any>(sql: string, params?: unknown[]): Promise<QueryResult<T>>;
+  connect(): Promise<DatabaseClient>;
+  end(): Promise<void>;
+}
+
+let pool: DBPool | null = null;
+
+function getConnectionString(): string {
+  return (
+    process.env.DATABASE_URL ||
+    `postgresql://${process.env.DB_USER || "shorts_app"}:${process.env.DB_PASSWORD || "change_this_secure_password"}@${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || "5432"}/${process.env.DB_NAME || "youtube_shorts_db"}`
+  );
+}
+
+function createPoolAdapter(): DBPool {
+  return {
+    query: async <T = any>(sql: string, params?: unknown[]) => {
+      const rows = await katax.db("main").query<T[]>(sql, params);
+      return {
+        rows: Array.isArray(rows) ? rows : [],
+        rowCount: Array.isArray(rows) ? rows.length : 0,
+      };
+    },
+    connect: async () => {
+      const rawClient = (await katax.db("main").getClient()) as {
+        query: (
+          sql: string,
+          params?: unknown[],
+        ) => Promise<{ rows?: unknown[]; rowCount?: number } | unknown[]>;
+        release?: () => void;
+      };
+
+      return {
+        query: async <T = any>(sql: string, params?: unknown[]) => {
+          const result = await rawClient.query(sql, params);
+
+          if (Array.isArray(result)) {
+            return {
+              rows: result as T[],
+              rowCount: result.length,
+            };
+          }
+
+          const rows = Array.isArray(result?.rows) ? (result.rows as T[]) : [];
+
+          return {
+            rows,
+            rowCount:
+              typeof result?.rowCount === "number"
+                ? result.rowCount
+                : rows.length,
+          };
+        },
+        release: () => {
+          rawClient.release?.();
+        },
+      };
+    },
+    end: async () => {
+      await closeDatabase();
+    },
+  };
+}
+
+export function getPool(): DBPool {
   if (!pool) {
     throw new Error("Database not initialized. Call initDatabase() first.");
   }
@@ -107,41 +180,62 @@ export function getPool(): Pool {
 
 export { pool };
 
-export function initDatabase(): Pool {
+export async function initDatabase(): Promise<DBPool> {
   if (pool) return pool;
 
-  const connectionString =
-    process.env.DATABASE_URL ||
-    `postgresql://${process.env.DB_USER || "shorts_app"}:${process.env.DB_PASSWORD || "change_this_secure_password"}@${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || "5432"}/${process.env.DB_NAME || "youtube_shorts_db"}`;
+  if (!katax.isInitialized) {
+    const appName = process.env.KATAX_APP_NAME || "video-generator";
+    await katax.init({
+      appName,
+      logger: {
+        level:
+          (process.env.LOG_LEVEL as
+            | "trace"
+            | "debug"
+            | "info"
+            | "warn"
+            | "error"
+            | "fatal"
+            | undefined) || "info",
+        prettyPrint: process.env.NODE_ENV !== "production",
+        enableBroadcast: true,
+      },
+    });
+    katax.logger.setAppName(appName);
+  }
 
-  pool = new Pool({
-    connectionString,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+  await katax.database({
+    name: "main",
+    type: "postgresql",
+    connection: getConnectionString(),
+    pool: {
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    },
   });
 
-  pool.on("error", (err) => {
-    Logger.error("Error inesperado en el pool de PostgreSQL:", err);
-  });
-
-  Logger.success("Conexión a PostgreSQL establecida");
+  pool = createPoolAdapter();
+  Logger.success("Conexión a PostgreSQL establecida (Katax)");
   return pool;
 }
 
-export function getDatabase(): Pool {
+export async function getDatabase(): Promise<DBPool> {
   if (!pool) {
-    return initDatabase();
+    return await initDatabase();
   }
   return pool;
 }
 
 export async function closeDatabase(): Promise<void> {
-  if (pool) {
-    await pool.end();
+  if (!katax.isInitialized) {
     pool = null;
-    Logger.info("Conexión a PostgreSQL cerrada");
+    return;
   }
+
+  await katax.shutdown();
+  pool = null;
+  Logger.info("Conexión a PostgreSQL cerrada");
 }
 
 // ============================================
@@ -149,7 +243,7 @@ export async function closeDatabase(): Promise<void> {
 // ============================================
 
 export async function startPipelineExecution(): Promise<string> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<{ id: string }>(
     "INSERT INTO pipeline_executions (status) VALUES ('running') RETURNING id",
   );
@@ -162,7 +256,7 @@ export async function completePipelineExecution(
   executionId: string,
   durationSeconds: number,
 ): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `UPDATE pipeline_executions 
      SET status = 'completed', completed_at = NOW(), duration_seconds = $1 
@@ -176,7 +270,7 @@ export async function failPipelineExecution(
   executionId: string,
   errorMessage: string,
 ): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `UPDATE pipeline_executions 
      SET status = 'failed', completed_at = NOW(), error_message = $1 
@@ -194,7 +288,7 @@ export async function saveTopic(
   topic: DBTopic,
   executionId?: string,
 ): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `INSERT INTO topics (id, title, description, image_keywords, video_keywords, execution_id, openai_model, openai_tokens_used, raw_response, generated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -221,7 +315,7 @@ export async function saveTopic(
 }
 
 export async function checkDuplicateTopic(title: string): Promise<boolean> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<{ exists: boolean }>(
     "SELECT check_duplicate_topic($1) as exists",
     [title],
@@ -230,7 +324,7 @@ export async function checkDuplicateTopic(title: string): Promise<boolean> {
 }
 
 export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<Topic>(
     'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT $1',
     [limit],
@@ -239,7 +333,7 @@ export async function getRecentTopics(limit: number = 50): Promise<Topic[]> {
 }
 
 export async function getLatestTopic(): Promise<Topic | null> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<Topic>(
     'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics ORDER BY generated_at DESC LIMIT 1',
   );
@@ -247,7 +341,7 @@ export async function getLatestTopic(): Promise<Topic | null> {
 }
 
 export async function getTopicById(topicId: string): Promise<Topic | null> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<Topic>(
     'SELECT id, title, description, image_keywords as "imageKeywords", video_keywords as "videoKeywords", generated_at as timestamp FROM topics WHERE id = $1',
     [topicId],
@@ -260,7 +354,7 @@ export async function getTopicById(topicId: string): Promise<Topic | null> {
 // ============================================
 
 export async function getLattestScript(): Promise<DBScript | null> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<DBScript>(
     "SELECT * FROM scripts ORDER BY created_at DESC LIMIT 1",
   );
@@ -270,7 +364,7 @@ export async function getLattestScript(): Promise<DBScript | null> {
 export async function getLatestScriptByLanguage(
   language: "es" | "en",
 ): Promise<DBScript | null> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<DBScript>(
     "SELECT * FROM scripts WHERE language = $1 ORDER BY created_at DESC LIMIT 1",
     [language],
@@ -279,7 +373,7 @@ export async function getLatestScriptByLanguage(
 }
 
 export async function saveScript(script: DBScript): Promise<string> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const wordCount = script.narrative.split(/\s+/).length;
   const result = await db.query<{ id: string }>(
     `INSERT INTO scripts (topic_id, language, title, narrative, description, tags, estimated_duration, word_count, openai_model, openai_tokens_used)
@@ -312,7 +406,7 @@ export async function saveScript(script: DBScript): Promise<string> {
 // ============================================
 
 export async function saveVideo(video: DBVideo): Promise<string> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<{ id: string }>(
     `INSERT INTO videos (script_id, language, channel_id, file_path, duration_seconds, width, height, file_size_mb, audio_voice, audio_file_path, subtitles_file_path, processing_time_seconds)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -344,7 +438,7 @@ export async function saveVideo(video: DBVideo): Promise<string> {
 export async function saveYouTubeUpload(
   upload: DBYouTubeUpload,
 ): Promise<string> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<{ id: string }>(
     `INSERT INTO youtube_uploads (video_id, youtube_video_id, youtube_url, channel, title, privacy_status, upload_duration_seconds)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -372,7 +466,7 @@ export async function saveYouTubeUpload(
 // ============================================
 
 export async function saveResourceUsage(usage: DBResourceUsage): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `INSERT INTO resource_usage (execution_id, openai_tokens_total, openai_cost_usd, storage_used_mb, processing_time_seconds, edge_tts_duration_seconds, ffmpeg_duration_seconds)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -394,7 +488,7 @@ export async function saveResourceUsage(usage: DBResourceUsage): Promise<void> {
 // ============================================
 
 export async function logError(error: DBErrorLog): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `INSERT INTO error_logs (execution_id, error_type, error_message, stack_trace, context)
      VALUES ($1, $2, $3, $4, $5)`,
@@ -414,7 +508,7 @@ export async function logError(error: DBErrorLog): Promise<void> {
 // ============================================
 
 export async function getTopicPerformance(limit: number = 10): Promise<any[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query(
     `SELECT * FROM topic_performance ORDER BY total_views DESC LIMIT $1`,
     [limit],
@@ -423,7 +517,7 @@ export async function getTopicPerformance(limit: number = 10): Promise<any[]> {
 }
 
 export async function getCostSummary(days: number = 30): Promise<any[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query(
     `SELECT * FROM cost_summary 
      WHERE execution_date >= CURRENT_DATE - INTERVAL '${days} days'
@@ -433,7 +527,7 @@ export async function getCostSummary(days: number = 30): Promise<any[]> {
 }
 
 export async function getChannelPerformance(): Promise<any[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query("SELECT * FROM channel_performance");
   return result.rows;
 }
@@ -445,7 +539,7 @@ export async function getChannelPerformance(): Promise<any[]> {
 export async function saveTopicImages(images: DBTopicImage[]): Promise<void> {
   if (images.length === 0) return;
 
-  const db = getDatabase();
+  const db = await getDatabase();
 
   for (const img of images) {
     await db.query(
@@ -472,7 +566,7 @@ export async function saveTopicImages(images: DBTopicImage[]): Promise<void> {
 }
 
 export async function getTopicImages(topicId: string): Promise<DBTopicImage[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<DBTopicImage>(
     `SELECT * FROM topic_images WHERE topic_id = $1 ORDER BY download_order`,
     [topicId],
@@ -486,7 +580,7 @@ export async function getTopicImages(topicId: string): Promise<DBTopicImage[]> {
 
 export async function checkDatabaseHealth(): Promise<boolean> {
   try {
-    const db = getDatabase();
+    const db = await getDatabase();
     await db.query("SELECT 1");
     Logger.success("Base de datos disponible");
     return true;
@@ -535,7 +629,7 @@ export interface ChannelConfig {
  * Obtiene todos los canales activos con información de su grupo
  */
 export async function getActiveChannels(): Promise<ChannelConfig[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<ChannelConfig>(
     `SELECT 
       c.*,
@@ -556,7 +650,7 @@ export async function markVideoUploadFailed(
   errorMessage: string,
   isQuotaError: boolean = false,
 ): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const status = isQuotaError ? "quota_exceeded" : "failed";
   await db.query(
     `UPDATE videos 
@@ -573,7 +667,7 @@ export async function markVideoUploadFailed(
  * Marca un video como exitosamente subido
  */
 export async function markVideoUploadSuccess(videoId: string): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `UPDATE videos 
      SET upload_status = 'uploaded', 
@@ -587,6 +681,7 @@ export async function markVideoUploadSuccess(videoId: string): Promise<void> {
  * Obtiene videos pendientes de upload (failed o quota_exceeded)
  * Excluye los que ya tuvieron más de 5 intentos
  * Videos con quota_exceeded esperan 24 horas antes de reintento
+ * Excluye videos con errores de autenticación (AUTH_REQUIRED)
  */
 export async function getPendingUploadVideos(): Promise<
   Array<
@@ -599,8 +694,16 @@ export async function getPendingUploadVideos(): Promise<
     }
   >
 > {
-  const db = getDatabase();
-  const result = await db.query(
+  type PendingUploadVideo = DBVideo & {
+    channel_id: string;
+    channel_name: string;
+    script_title: string;
+    script_description: string;
+    script_tags: string[];
+  };
+
+  const db = await getDatabase();
+  const result = await db.query<PendingUploadVideo>(
     `SELECT 
        v.*,
        s.title as script_title,
@@ -612,8 +715,9 @@ export async function getPendingUploadVideos(): Promise<
      INNER JOIN scripts s ON v.script_id = s.id
      INNER JOIN channels c ON v.channel_id = c.id AND c.enabled = true  -- 🔧 JOIN por channel_id específico
      WHERE (
-       -- Videos 'failed' se reintentan inmediatamente
-       (v.upload_status = 'failed')
+       -- Videos 'failed' se reintentan inmediatamente (excepto errores de auth)
+       (v.upload_status = 'failed' 
+        AND COALESCE(v.last_error, '') NOT LIKE '%AUTH_REQUIRED%')
        OR 
        -- Videos 'quota_exceeded' esperan 24 horas
        (v.upload_status = 'quota_exceeded' 
@@ -635,7 +739,7 @@ export async function getPendingUploadVideos(): Promise<
 export async function getChannelsByGroup(
   groupId: string,
 ): Promise<ChannelConfig[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<ChannelConfig>(
     `SELECT c.* FROM channels c WHERE c.group_id = $1 AND c.enabled = true`,
     [groupId],
@@ -649,7 +753,7 @@ export async function getChannelsByGroup(
 export async function getChannelById(
   id: string,
 ): Promise<ChannelConfig | null> {
-  const db = getDatabase();
+  const db = await getDatabase();
   const result = await db.query<ChannelConfig>(
     `SELECT c.* FROM channels c WHERE c.id = $1`,
     [id],
@@ -673,7 +777,7 @@ export async function getChannelPrompts(
   channelId: string,
   type?: string,
 ): Promise<PromptConfig[]> {
-  const db = getDatabase();
+  const db = await getDatabase();
 
   let query = `SELECT * FROM prompts WHERE channel_id = $1 AND enabled = true`;
   const params: any[] = [channelId];
@@ -702,7 +806,7 @@ export async function updateChannelTokens(
     scope?: string;
   },
 ): Promise<void> {
-  const db = getDatabase();
+  const db = await getDatabase();
   await db.query(
     `UPDATE channels 
      SET youtube_access_token = $1,

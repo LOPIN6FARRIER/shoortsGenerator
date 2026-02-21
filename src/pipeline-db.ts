@@ -57,7 +57,7 @@ export async function executePipelineFromDB(
     Logger.info("");
 
     // Inicializar BD
-    initDatabase();
+    await initDatabase();
     const dbHealthy = await checkDatabaseHealth();
     if (!dbHealthy) {
       throw new Error("Base de datos no disponible");
@@ -240,7 +240,9 @@ async function processChannelGroup(
     firstChannel.language as "es" | "en",
     firstChannel.id,
   );
-  Logger.success(`Topic base (${firstChannel.language.toUpperCase()}): "${topic.title}"`);
+  Logger.success(
+    `Topic base (${firstChannel.language.toUpperCase()}): "${topic.title}"`,
+  );
 
   await saveTopic({ ...topic, execution_id: executionId });
 

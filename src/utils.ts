@@ -1,73 +1,90 @@
-import pino from "pino";
+import { katax } from "katax-service-manager";
 import { existsSync, mkdirSync, unlinkSync, rmSync } from "fs";
 import { dirname } from "path";
 
-const isDevelopment = process.env.NODE_ENV !== "production";
-
-/**
- * Pino logger configuration
- * - Pretty printing in development
- * - JSON logs in production
- */
-const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
-  transport: isDevelopment
-    ? {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "HH:MM:ss",
-          ignore: "pid,hostname",
-        },
-      }
-    : undefined,
-  formatters: {
-    level: (label) => {
-      return { level: label };
-    },
-  },
-});
+function getKataxLogger() {
+  if (!katax.isInitialized) {
+    return null;
+  }
+  return katax.logger;
+}
 
 /**
  * Logger class compatible with existing codebase
  */
 export class Logger {
   static info(message: string, data?: any): void {
-    if (data && typeof data === "object") {
-      logger.info(data, message);
-    } else {
-      logger.info(message);
+    const kataxLogger = getKataxLogger();
+    if (kataxLogger) {
+      kataxLogger.info({
+        message,
+        ...(data && typeof data === "object" ? data : {}),
+      });
+      return;
     }
+    console.info(message, data ?? "");
   }
 
   static error(message: string, error?: any): void {
-    if (error instanceof Error) {
-      logger.error({ err: error }, message);
-    } else if (error) {
-      logger.error({ data: error }, message);
-    } else {
-      logger.error(message);
+    const kataxLogger = getKataxLogger();
+    if (kataxLogger) {
+      if (error instanceof Error) {
+        kataxLogger.error({
+          message,
+          err: error,
+          broadcast: true,
+          persist: true,
+        });
+        return;
+      }
+      if (error) {
+        kataxLogger.error({
+          message,
+          data: error,
+          broadcast: true,
+          persist: true,
+        });
+        return;
+      }
+      kataxLogger.error({ message, broadcast: true, persist: true });
+      return;
     }
+    console.error(message, error ?? "");
   }
 
   static success(message: string): void {
-    logger.info(`✅ ${message}`);
+    const kataxLogger = getKataxLogger();
+    if (kataxLogger) {
+      kataxLogger.info({ message: `✅ ${message}`, broadcast: true });
+      return;
+    }
+    console.info(`✅ ${message}`);
   }
 
   static warn(message: string, data?: any): void {
-    if (data) {
-      logger.warn(data, message);
-    } else {
-      logger.warn(message);
+    const kataxLogger = getKataxLogger();
+    if (kataxLogger) {
+      kataxLogger.warn({
+        message,
+        ...(data && typeof data === "object" ? data : {}),
+        broadcast: true,
+      });
+      return;
     }
+    console.warn(message, data ?? "");
   }
 
   static debug(message: string, data?: any): void {
-    if (data) {
-      logger.debug(data, message);
-    } else {
-      logger.debug(message);
+    const kataxLogger = getKataxLogger();
+    if (kataxLogger) {
+      kataxLogger.debug({
+        message,
+        ...(data && typeof data === "object" ? data : {}),
+        broadcast: true,
+      });
+      return;
     }
+    console.debug(message, data ?? "");
   }
 }
 
@@ -115,7 +132,7 @@ export function cleanupVideoDirectory(videoPath: string): void {
   try {
     // Obtener el directorio del video (ej: output/es/2026-02-12-title/)
     const videoDir = dirname(videoPath);
-    
+
     if (existsSync(videoDir)) {
       Logger.info(`🧹 Limpiando archivos del video: ${videoDir}`);
       cleanupDirectory(videoDir);

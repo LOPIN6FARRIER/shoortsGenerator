@@ -8,8 +8,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, "..", ".env") });
 
 export interface ChannelConfig {
-  language: string;
-  voice: string;
+  language: "es" | "en";
   youtubeClientId: string;
   youtubeClientSecret: string;
   youtubeRedirectUri: string;
@@ -25,48 +24,21 @@ export const CONFIG = {
   ollama: {
     enabled: process.env.OLLAMA_ENABLED !== "false", // Habilitado por defecto
     baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434/v1",
-    model: process.env.OLLAMA_MODEL || "llama3.1:8b", // Recomendado: balance calidad/RAM
+    model: process.env.OLLAMA_MODEL || "qwen2.5:14b",
   },
-
-  channels: {
-    es: {
-      language: "es",
-      voice: process.env.ES_VOICE || "es-MX-DaliaNeural",
-      youtubeClientId: process.env.ES_YOUTUBE_CLIENT_ID || "",
-      youtubeClientSecret: process.env.ES_YOUTUBE_CLIENT_SECRET || "",
-      youtubeRedirectUri:
-        process.env.ES_YOUTUBE_REDIRECT_URI ||
-        "http://localhost:3000/oauth2callback",
-      youtubeCredentialsPath:
-        process.env.ES_YOUTUBE_CREDENTIALS_PATH || "./credentials-es.json",
-    } as ChannelConfig,
-    en: {
-      language: "en",
-      voice: process.env.EN_VOICE || "en-US-JennyNeural",
-      youtubeClientId: process.env.EN_YOUTUBE_CLIENT_ID || "",
-      youtubeClientSecret: process.env.EN_YOUTUBE_CLIENT_SECRET || "",
-      youtubeRedirectUri:
-        process.env.EN_YOUTUBE_REDIRECT_URI ||
-        "http://localhost:3000/oauth2callback",
-      youtubeCredentialsPath:
-        process.env.EN_YOUTUBE_CREDENTIALS_PATH || "./credentials-en.json",
-    } as ChannelConfig,
-  },
-
-  video: {
-    width: parseInt(process.env.VIDEO_WIDTH || "1080"),
-    height: parseInt(process.env.VIDEO_HEIGHT || "1920"),
-    fps: parseInt(process.env.VIDEO_FPS || "30"),
-    maxDuration: parseInt(process.env.VIDEO_DURATION || "60"),
-    useVideos: process.env.USE_PEXELS_VIDEOS === "true", // Usar videos en lugar de imágenes
-  },
-
   unsplash: {
     accessKey: process.env.UNSPLASH_ACCESS_KEY || "",
   },
 
   pexels: {
     apiKey: process.env.PEXELS_API_KEY || "",
+  },
+
+  video: {
+    width: Number(process.env.VIDEO_WIDTH || 1080),
+    height: Number(process.env.VIDEO_HEIGHT || 1920),
+    fps: Number(process.env.VIDEO_FPS || 30),
+    useVideos: process.env.USE_PEXELS_VIDEOS === "true",
   },
 
   paths: {

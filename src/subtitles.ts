@@ -22,12 +22,9 @@ interface WhisperWord {
 
 let openaiClient: OpenAI | null = null;
 
-function getOpenAIClient(): OpenAI {
+function getOpenAIClient(): OpenAI | null {
   if (!CONFIG.openai.apiKey) {
-    throw new Error(
-      "⚠️  OPENAI_API_KEY no configurada. Whisper API requiere OpenAI.\n" +
-        "   💡 Alternativa: Instalar whisper.cpp localmente para transcripción sin API.",
-    );
+    return null;
   }
 
   if (!openaiClient) {
@@ -113,32 +110,41 @@ export async function generateShortsOptimizedSRT(
 
 /**
  * Transcribe audio con Whisper y obtiene timestamps palabra por palabra
+ * Usa OpenAI Whisper
  */
 async function transcribeWithWhisper(
   audioPath: string,
   language: string,
 ): Promise<WhisperWord[]> {
-  const client = getOpenAIClient();
-
   Logger.info("🎤 Transcribiendo audio con Whisper...");
 
   const audioFile = readFileSync(audioPath);
   const audioBlob = new File([audioFile], "audio.mp3", { type: "audio/mpeg" });
 
-  const response = await client.audio.transcriptions.create({
-    file: audioBlob,
-    model: "whisper-1",
-    language: language,
-    response_format: "verbose_json",
-    timestamp_granularities: ["word"],
-  });
+  // OpenAI
+  const openai = getOpenAIClient();
+  if (openai) {
+    Logger.info("🤖 Usando OpenAI Whisper...");
+    const response = await openai.audio.transcriptions.create({
+      file: audioBlob,
+      model: "whisper-1",
+      language: language,
+      response_format: "verbose_json",
+      timestamp_granularities: ["word"],
+    });
 
-  // @ts-ignore - La API retorna words cuando se pide word timestamps
-  const words: WhisperWord[] = response.words || [];
+    // @ts-ignore - La API retorna words cuando se pide word timestamps
+    const words: WhisperWord[] = response.words || [];
+    Logger.info(
+      `✅ OpenAI Whisper detectó ${words.length} palabras con timestamps`,
+    );
+    return words;
+  }
 
-  Logger.info(`✅ Whisper detectó ${words.length} palabras con timestamps`);
-
-  return words;
+  throw new Error(
+    "⚠️  OPENAI_API_KEY no está configurada para Whisper.\n" +
+      "   💡 Configura OPENAI_API_KEY para transcripción.",
+  );
 }
 
 /**
