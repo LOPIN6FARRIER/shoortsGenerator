@@ -716,8 +716,8 @@ export async function getPendingUploadVideos(): Promise<
      INNER JOIN channels c ON v.channel_id = c.id AND c.enabled = true  -- 🔧 JOIN por channel_id específico
      WHERE (
        -- Videos 'failed' se reintentan inmediatamente (excepto errores de auth)
-       (v.upload_status = 'failed' 
-        AND COALESCE(v.last_error, '') NOT LIKE '%AUTH_REQUIRED%')
+      (v.upload_status = 'failed' 
+       AND COALESCE(v.upload_error_message, '') NOT LIKE '%AUTH_REQUIRED%')
        OR 
        -- Videos 'quota_exceeded' esperan 24 horas
        (v.upload_status = 'quota_exceeded' 
