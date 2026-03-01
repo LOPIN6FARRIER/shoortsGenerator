@@ -25,6 +25,7 @@ function titleToKebabCase(title: string): string {
 export async function generateTopic(
   language: "es" | "en" = "es",
   channelId?: string,
+  additionalTopicsToAvoid: Topic[] = [],
 ): Promise<Topic> {
   // 🔍 MODO DEBUGGING: Intentar reutilizar último topic de BD
   if (process.env.DEBUGGING === "true") {
@@ -55,10 +56,12 @@ export async function generateTopic(
     }
   }
 
-  // 🚫 EVITAR REPETICIÓN: Obtener topics recientes para no duplicar
-  const recentTopics = await getRecentTopics(20);
-  if (recentTopics.length > 0) {
-    const topicsList = recentTopics
+  // 🚫 EVITAR REPETICIÓN: Combinar topics de BD + topics ya generados en esta ejecución
+  const recentTopics = await getRecentTopics(30);
+  const allTopicsToAvoid = [...recentTopics, ...additionalTopicsToAvoid];
+
+  if (allTopicsToAvoid.length > 0) {
+    const topicsList = allTopicsToAvoid
       .map((t, i) => `${i + 1}. "${t.title}"`)
       .join("\n");
 
@@ -73,7 +76,7 @@ Generate a fresh, unique topic that hasn't been covered yet.
 
     prompt = prompt + avoidRepetitionNote;
     Logger.info(
-      `🔍 Evitando repetición de ${recentTopics.length} topics recientes`,
+      `🔍 Evitando repetición de ${allTopicsToAvoid.length} topics (${recentTopics.length} de BD + ${additionalTopicsToAvoid.length} de esta ejecución)`,
     );
   }
 

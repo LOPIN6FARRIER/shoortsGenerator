@@ -827,3 +827,22 @@ export async function updateChannelTokens(
   );
   Logger.info(`Tokens de YouTube actualizados para canal ${channelId}`);
 }
+
+/**
+ * Limpia todos los tokens de YouTube de un canal (cuando son inválidos)
+ */
+export async function clearChannelTokens(channelId: string): Promise<void> {
+  const db = await getDatabase();
+  await db.query(
+    `UPDATE channels 
+     SET youtube_access_token = NULL,
+         youtube_refresh_token = NULL,
+         youtube_token_expiry = NULL,
+         youtube_token_type = NULL,
+         youtube_scope = NULL,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [channelId],
+  );
+  Logger.warn(`🔒 Tokens de YouTube limpiados para canal ${channelId} - Re-autenticación requerida`);
+}

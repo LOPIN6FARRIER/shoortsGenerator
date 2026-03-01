@@ -13,6 +13,14 @@ import { generateTTS, checkEdgeTTS } from "./tts.js";
 import { generateShortsOptimizedSRT } from "./subtitles.js";
 import { generateVideo, checkFFmpeg } from "./video.js";
 import { uploadToYouTube } from "./upload.js";
+import {
+  notifyPipelineStart,
+  notifyPipelineComplete,
+  notifyPipelineError,
+  notifyVideoSuccess,
+  notifyVideoError,
+  notifyQuotaExceeded,
+} from "./notifications.js";
 import { Script, generateScriptWithPrompt } from "./script.js";
 import {
   initDatabase,
@@ -145,6 +153,14 @@ export async function executePipelineFromDB(
     Logger.info(`📊 Canales independientes: ${independentChannels.length}`);
     Logger.info("");
 
+    // � Notificar inicio de pipeline
+    await notifyPipelineStart(validChannels.length);
+
+    // 🔍 Trackear topics generados en esta ejecución para evitar duplicados
+    const generatedTopicsInExecution: Topic[] = [];
+    let videosGenerated = 0;
+    let errorsCount = 0;
+
     // Procesar cada grupo de canales (mismo contenido, diferentes idiomas)
     for (const [groupId, groupChannels] of channelGroups.entries()) {
       try {
@@ -155,7 +171,9 @@ export async function executePipelineFromDB(
         );
         Logger.info("=".repeat(60));
 
-        await processChannelGroup(groupChannels, executionId);
+        const groupResult = await processChannelGroup(groupChannels, executionId, generatedTopicsInExecution);
+        videosGenerated += groupResult.videosGenerated;
+        errorsCount += groupResult.errors;
       } catch (error: any) {
         Logger.error(`❌ Error procesando grupo ${groupId}: ${error.message}`);
         await logError({
@@ -179,7 +197,9 @@ export async function executePipelineFromDB(
         Logger.info(`📺 PROCESANDO CANAL INDEPENDIENTE: ${channel.name}`);
         Logger.info("=".repeat(60));
 
-        await processChannelGroup([channel], executionId);
+        const channelResult = await processChannelGroup([channel], executionId, generatedTopicsInExecution);
+        videosGenerated += channelResult.videosGenerated;
+        errorsCount += channelResult.errors;
       } catch (error: any) {
         Logger.error(
           `❌ Error procesando canal ${channel.name}: ${error.message}`,
@@ -202,11 +222,18 @@ export async function executePipelineFromDB(
     const processingTime = Math.round((Date.now() - startTime) / 1000);
     await completePipelineExecution(executionId, processingTime);
 
+    // 📱 Notificar completación
+    await notifyPipelineComplete(videosGenerated, errorsCount, processingTime);
+
     Logger.info("\n" + "=".repeat(80));
     Logger.success("✅ PIPELINE COMPLETADO EXITOSAMENTE");
     Logger.info("=".repeat(80));
   } catch (error: any) {
     Logger.error("❌ ERROR EN PIPELINE:", error.message);
+    
+    // 📱 Notificar error crítico
+    await notifyPipelineError(error.message);
+    
     if (executionId) {
       await failPipelineExecution(executionId, error.message);
     }
@@ -222,7 +249,11 @@ export async function executePipelineFromDB(
 async function processChannelGroup(
   channels: ChannelConfig[],
   executionId: string,
-): Promise<void> {
+  generatedTopicsInExecution: Topic[],
+): Promise<{ videosGenerated: number; errors: number }> {
+  let videosGenerated = 0;
+  let errors = 0;
+
   // Verificar dependencias
   Logger.info("Verificando dependencias...");
   const hasEdgeTTS = await checkEdgeTTS();
@@ -239,10 +270,14 @@ async function processChannelGroup(
   const topic = await generateTopic(
     firstChannel.language as "es" | "en",
     firstChannel.id,
+    generatedTopicsInExecution,
   );
   Logger.success(
     `Topic base (${firstChannel.language.toUpperCase()}): "${topic.title}"`,
   );
+
+  // 🔍 Agregar topic al tracking para evitar duplicados en siguientes ejecuciones
+  generatedTopicsInExecution.push(topic);
 
   await saveTopic({ ...topic, execution_id: executionId });
 
@@ -400,6 +435,16 @@ async function processChannelGroup(
         });
 
         Logger.success(`✅ ${channel.name}: ${uploadResult.url}`);
+        
+        // 📱 Notificar éxito
+        await notifyVideoSuccess(
+          channel.name,
+          channel.language,
+          script.title,
+          uploadResult.url,
+        );
+        
+        videosGenerated++;
       } catch (uploadError: any) {
         // Si el upload falla, registrar error pero continuar con otros canales
         Logger.error(
@@ -415,6 +460,17 @@ async function processChannelGroup(
           Logger.warn(
             `⚠️  Límite de cuota de YouTube alcanzado para ${channel.name}. Se reintentará más tarde.`,
           );
+          
+          // 📱 Notificar cuota excedida
+          await notifyQuotaExceeded(channel.name);
+        } else {
+          // 📱 Notificar error de upload
+          await notifyVideoError(
+            channel.name,
+            channel.language,
+            script.title,
+            uploadError.message,
+          );
         }
 
         // Marcar video como fallido (se reintentará después)
@@ -423,6 +479,8 @@ async function processChannelGroup(
           uploadError.message,
           isQuotaError,
         );
+        
+        errors++;
 
         // Guardar video localmente aunque el upload falle
         results.push({
@@ -461,6 +519,11 @@ async function processChannelGroup(
       });
 
       Logger.success(`✅ ${channel.name}: ${videoResult.videoPath}`);
+      
+      // 📱 Notificar éxito local (modo debugging o sin auth)
+      if (process.env.DEBUGGING !== "true") {
+        videosGenerated++;
+      }
     }
   }
 
@@ -493,4 +556,6 @@ async function processChannelGroup(
   }
 
   Logger.success(`✅ Grupo procesado exitosamente`);
+  
+  return { videosGenerated, errors };
 }

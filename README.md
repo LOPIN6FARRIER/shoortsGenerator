@@ -11,6 +11,8 @@ Sistema automatizado para crear y publicar YouTube Shorts de micro-documentales 
 - ✅ Subtítulos automáticos quemados en el video
 - ✅ Publicación automática en dos canales de YouTube separados
 - ✅ Ejecución programada con node-cron personalizable
+- ✅ Notificaciones en tiempo real vía Telegram 📱
+- ✅ Sistema de re-autenticación automático
 - ✅ Logger profesional con Pino
 - ✅ 100% ES Modules + TypeScript moderno
 
@@ -97,13 +99,38 @@ npm run auth
 # Se guardarán credentials-es.json y credentials-en.json
 ```
 
-### 5. Compilar Proyecto
+### 5. Configurar Notificaciones Telegram (Opcional pero Recomendado) 📱
+
+Recibe alertas en tiempo real sobre videos generados, errores y re-autenticaciones.
+
+**Configuración rápida (2 minutos):**
+
+1. Buscar `@BotFather` en Telegram
+2. Enviar `/newbot` y seguir instrucciones
+3. Copiar el **token** que te da
+4. Buscar `@userinfobot` en Telegram
+5. Enviar `/start` y copiar tu **Chat ID**
+6. Agregar al `.env`:
+   ```env
+   TELEGRAM_ENABLED=true
+   TELEGRAM_BOT_TOKEN=tu_token_aqui
+   TELEGRAM_CHAT_ID=tu_chat_id_aqui
+   ```
+
+**Probar:**
+```bash
+npx tsx test-telegram.ts
+```
+
+📖 **Guía completa**: Ver [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)
+
+### 6. Compilar Proyecto
 
 ```bash
 npm run build
 ```
 
-### 6. Opciones de Ejecución
+### 7. Opciones de Ejecución
 
 #### A. Con PM2 (Recomendado)
 

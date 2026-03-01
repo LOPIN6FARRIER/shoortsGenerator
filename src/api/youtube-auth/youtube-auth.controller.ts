@@ -279,6 +279,63 @@ export async function handleManualOAuthCode(
 }
 
 /**
+ * Lista todos los canales con su estado de autenticación
+ */
+export async function checkAllChannelsAuthStatus(): Promise<
+  ControllerResult<{
+    channels: Array<{
+      id: string;
+      name: string;
+      language: string;
+      isAuthenticated: boolean;
+      tokenExpiry: number | null;
+      needsReauth: boolean;
+    }>;
+  }>
+> {
+  try {
+    const pool = getPool();
+
+    const result = await pool.query(
+      `SELECT 
+         id, 
+         name, 
+         language,
+         youtube_access_token,
+         youtube_refresh_token,
+         youtube_token_expiry,
+         enabled
+       FROM channels
+       ORDER BY name`,
+    );
+
+    const now = Date.now();
+    const channels = result.rows.map((channel) => {
+      const hasTokens =
+        !!channel.youtube_access_token && !!channel.youtube_refresh_token;
+      const tokenExpiry = channel.youtube_token_expiry || null;
+      const isExpired = tokenExpiry ? now >= tokenExpiry : false;
+
+      return {
+        id: channel.id,
+        name: channel.name,
+        language: channel.language,
+        isAuthenticated: hasTokens && !isExpired,
+        tokenExpiry,
+        needsReauth: !hasTokens || isExpired,
+      };
+    });
+
+    return createSuccessResult("Channels auth status retrieved", { channels });
+  } catch (error: any) {
+    return createErrorResult(
+      "Failed to check channels auth status",
+      error.message,
+    );
+  }
+}
+
+/**
  * Verifica si un canal está autenticado con YouTube
  */
 export async function checkAuthStatus(

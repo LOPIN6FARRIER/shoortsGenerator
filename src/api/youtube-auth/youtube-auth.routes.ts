@@ -11,6 +11,19 @@ import { sendResponse } from "../shared/api.utils.js";
 const router = Router();
 
 /**
+ * GET /api/youtube-auth/channels-status
+ * Lista todos los canales con su estado de autenticación
+ */
+router.get(
+  "/channels-status",
+  async (req: Request, res: Response): Promise<void> => {
+    const { checkAllChannelsAuthStatus } = await import("./youtube-auth.controller.js");
+    const result = await checkAllChannelsAuthStatus();
+    res.status(result.statusCode || 200).json(result);
+  },
+);
+
+/**
  * GET /api/youtube-auth/:channelId/auth-url
  * Genera URL de autenticación OAuth2
  */
