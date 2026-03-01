@@ -155,7 +155,7 @@ export async function retryPendingUploads(): Promise<void> {
         cleanupVideoDirectory(video.file_path);
 
         Logger.success(`✅ ${video.script_title}: ${uploadResult.url}`);
-        
+
         // 📱 Notificar éxito en reintento
         await notifyVideoSuccess(
           channel.name,
@@ -163,7 +163,7 @@ export async function retryPendingUploads(): Promise<void> {
           video.script_title,
           uploadResult.url,
         );
-        
+
         successCount++;
       } catch (error: any) {
         Logger.error(`❌ Error: ${error.message}`);
@@ -184,7 +184,7 @@ export async function retryPendingUploads(): Promise<void> {
             "⚠️  Límite de cuota alcanzado. Deteniendo reintentos en este lote.",
           );
           quotaLimitReached = true;
-          
+
           // 📱 Notificar cuota excedida
           await notifyQuotaExceeded(video.channel_name);
         }
@@ -197,10 +197,10 @@ export async function retryPendingUploads(): Promise<void> {
           Logger.error(
             `   ➡️  Re-autentica el canal desde el dashboard para resolver.`,
           );
-          
+
           // 📱 Notificar que se requiere re-autenticación
           await notifyReauthRequired(video.channel_name, video.channel_id);
-          
+
           // Marcar con flag especial para no reintentar más
           await markVideoUploadFailed(
             video.id!,
@@ -226,7 +226,7 @@ export async function retryPendingUploads(): Promise<void> {
 
         // Marcar como fallido
         await markVideoUploadFailed(video.id!, error.message, isQuotaError);
-        
+
         // 📱 Notificar error (solo si no es cuota ni auth, ya notificados arriba)
         if (!isQuotaError && !isAuthError) {
           await notifyVideoError(
