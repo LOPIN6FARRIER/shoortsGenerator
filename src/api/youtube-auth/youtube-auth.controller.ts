@@ -216,7 +216,9 @@ export async function handleManualOAuthCode(
       !channel.youtube_client_secret ||
       !channel.youtube_redirect_uri
     ) {
-      Logger.error(`[OAuth] Incomplete OAuth config for channel: ${channel.name}`);
+      Logger.error(
+        `[OAuth] Incomplete OAuth config for channel: ${channel.name}`,
+      );
       Logger.error(
         `[OAuth] Has client_id: ${!!channel.youtube_client_id}, client_secret: ${!!channel.youtube_client_secret}, redirect_uri: ${!!channel.youtube_redirect_uri}`,
       );

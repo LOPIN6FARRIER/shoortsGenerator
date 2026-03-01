@@ -17,7 +17,8 @@ const router = Router();
 router.get(
   "/channels-status",
   async (req: Request, res: Response): Promise<void> => {
-    const { checkAllChannelsAuthStatus } = await import("./youtube-auth.controller.js");
+    const { checkAllChannelsAuthStatus } =
+      await import("./youtube-auth.controller.js");
     const result = await checkAllChannelsAuthStatus();
     res.status(result.statusCode || 200).json(result);
   },

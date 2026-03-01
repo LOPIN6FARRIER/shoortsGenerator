@@ -81,15 +81,18 @@ export async function uploadToYouTube(
           }
         } catch (refreshError: any) {
           Logger.error("Error refrescando token:", refreshError.message);
-          
+
           // Si es invalid_grant, limpiar tokens inválidos de BD
-          if (refreshError.message?.includes('invalid_grant') && channelId) {
-            Logger.warn(`⚠️  Refresh token inválido para canal ${channelId}. Limpiando tokens...`);
+          if (refreshError.message?.includes("invalid_grant") && channelId) {
+            Logger.warn(
+              `⚠️  Refresh token inválido para canal ${channelId}. Limpiando tokens...`,
+            );
             try {
-              const { clearChannelTokens, getChannelById } = await import("./database.js");
+              const { clearChannelTokens, getChannelById } =
+                await import("./database.js");
               await clearChannelTokens(channelId);
               Logger.info(`✅ Tokens limpiados. Re-autenticación requerida.`);
-              
+
               // 📱 Notificar que se necesita re-autenticación
               const channel = await getChannelById(channelId);
               if (channel) {
@@ -99,7 +102,7 @@ export async function uploadToYouTube(
               Logger.error(`Error limpiando tokens: ${clearError.message}`);
             }
           }
-          
+
           throw new Error(
             `Token expirado y no se pudo refrescar: ${refreshError.message}. ${getReauthHint(channelId)}`,
           );
@@ -246,13 +249,16 @@ export async function refreshChannelTokensIfNeeded(
       Logger.error(
         `❌ Error refrescando tokens para canal ${channelId}: invalid_grant - Refresh token inválido o revocado`,
       );
-      
+
       // Limpiar tokens inválidos de BD
       try {
-        const { clearChannelTokens, getChannelById } = await import("./database.js");
+        const { clearChannelTokens, getChannelById } =
+          await import("./database.js");
         await clearChannelTokens(channelId);
-        Logger.warn(`⚠️  Tokens limpiados para canal ${channelId}. Re-autenticación requerida via dashboard.`);
-        
+        Logger.warn(
+          `⚠️  Tokens limpiados para canal ${channelId}. Re-autenticación requerida via dashboard.`,
+        );
+
         // 📱 Notificar que se necesita re-autenticación
         const channel = await getChannelById(channelId);
         if (channel) {
@@ -261,7 +267,7 @@ export async function refreshChannelTokensIfNeeded(
       } catch (clearError: any) {
         Logger.error(`Error limpiando tokens: ${clearError.message}`);
       }
-      
+
       return false;
     }
 

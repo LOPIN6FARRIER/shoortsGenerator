@@ -171,7 +171,11 @@ export async function executePipelineFromDB(
         );
         Logger.info("=".repeat(60));
 
-        const groupResult = await processChannelGroup(groupChannels, executionId, generatedTopicsInExecution);
+        const groupResult = await processChannelGroup(
+          groupChannels,
+          executionId,
+          generatedTopicsInExecution,
+        );
         videosGenerated += groupResult.videosGenerated;
         errorsCount += groupResult.errors;
       } catch (error: any) {
@@ -197,7 +201,11 @@ export async function executePipelineFromDB(
         Logger.info(`📺 PROCESANDO CANAL INDEPENDIENTE: ${channel.name}`);
         Logger.info("=".repeat(60));
 
-        const channelResult = await processChannelGroup([channel], executionId, generatedTopicsInExecution);
+        const channelResult = await processChannelGroup(
+          [channel],
+          executionId,
+          generatedTopicsInExecution,
+        );
         videosGenerated += channelResult.videosGenerated;
         errorsCount += channelResult.errors;
       } catch (error: any) {
@@ -230,10 +238,10 @@ export async function executePipelineFromDB(
     Logger.info("=".repeat(80));
   } catch (error: any) {
     Logger.error("❌ ERROR EN PIPELINE:", error.message);
-    
+
     // 📱 Notificar error crítico
     await notifyPipelineError(error.message);
-    
+
     if (executionId) {
       await failPipelineExecution(executionId, error.message);
     }
@@ -435,7 +443,7 @@ async function processChannelGroup(
         });
 
         Logger.success(`✅ ${channel.name}: ${uploadResult.url}`);
-        
+
         // 📱 Notificar éxito
         await notifyVideoSuccess(
           channel.name,
@@ -443,7 +451,7 @@ async function processChannelGroup(
           script.title,
           uploadResult.url,
         );
-        
+
         videosGenerated++;
       } catch (uploadError: any) {
         // Si el upload falla, registrar error pero continuar con otros canales
@@ -460,7 +468,7 @@ async function processChannelGroup(
           Logger.warn(
             `⚠️  Límite de cuota de YouTube alcanzado para ${channel.name}. Se reintentará más tarde.`,
           );
-          
+
           // 📱 Notificar cuota excedida
           await notifyQuotaExceeded(channel.name);
         } else {
@@ -479,7 +487,7 @@ async function processChannelGroup(
           uploadError.message,
           isQuotaError,
         );
-        
+
         errors++;
 
         // Guardar video localmente aunque el upload falle
@@ -519,7 +527,7 @@ async function processChannelGroup(
       });
 
       Logger.success(`✅ ${channel.name}: ${videoResult.videoPath}`);
-      
+
       // 📱 Notificar éxito local (modo debugging o sin auth)
       if (process.env.DEBUGGING !== "true") {
         videosGenerated++;
@@ -556,6 +564,6 @@ async function processChannelGroup(
   }
 
   Logger.success(`✅ Grupo procesado exitosamente`);
-  
+
   return { videosGenerated, errors };
 }

@@ -844,5 +844,7 @@ export async function clearChannelTokens(channelId: string): Promise<void> {
      WHERE id = $1`,
     [channelId],
   );
-  Logger.warn(`🔒 Tokens de YouTube limpiados para canal ${channelId} - Re-autenticación requerida`);
+  Logger.warn(
+    `🔒 Tokens de YouTube limpiados para canal ${channelId} - Re-autenticación requerida`,
+  );
 }

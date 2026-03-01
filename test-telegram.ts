@@ -15,11 +15,15 @@ async function testTelegramNotifications() {
 
   console.log(`📋 Configuración:`);
   console.log(`   TELEGRAM_ENABLED: ${enabled}`);
-  console.log(`   TELEGRAM_BOT_TOKEN: ${token ? "✅ Configurado" : "❌ No configurado"}`);
+  console.log(
+    `   TELEGRAM_BOT_TOKEN: ${token ? "✅ Configurado" : "❌ No configurado"}`,
+  );
   console.log(`   TELEGRAM_CHAT_ID: ${chatId || "❌ No configurado"}\n`);
 
   if (!enabled) {
-    console.log("⚠️  Telegram está deshabilitado. Configura TELEGRAM_ENABLED=true en .env");
+    console.log(
+      "⚠️  Telegram está deshabilitado. Configura TELEGRAM_ENABLED=true en .env",
+    );
     return;
   }
 
@@ -54,21 +58,27 @@ async function testTelegramNotifications() {
       const error = await response.text();
       console.error("❌ Error al enviar mensaje:");
       console.error(error);
-      
+
       if (error.includes("Unauthorized")) {
-        console.log("\n💡 Solución: Verifica que el TELEGRAM_BOT_TOKEN sea correcto");
+        console.log(
+          "\n💡 Solución: Verifica que el TELEGRAM_BOT_TOKEN sea correcto",
+        );
       } else if (error.includes("chat not found")) {
-        console.log("\n💡 Solución: Envía un mensaje a tu bot primero (busca tu bot y envía /start)");
+        console.log(
+          "\n💡 Solución: Envía un mensaje a tu bot primero (busca tu bot y envía /start)",
+        );
       }
       return;
     }
 
     console.log("\n✅ ¡Mensaje enviado exitosamente!");
-    console.log("   Revisa tu Telegram, deberías haber recibido un mensaje 📱\n");
+    console.log(
+      "   Revisa tu Telegram, deberías haber recibido un mensaje 📱\n",
+    );
 
     // Probar mensaje con formato
     console.log("📤 Enviando mensaje de prueba con formato...");
-    
+
     const response2 = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -91,9 +101,10 @@ Este es un ejemplo de cómo se verán las notificaciones:
     if (response2.ok) {
       console.log("✅ Segundo mensaje enviado!\n");
       console.log("🎉 Todo funciona correctamente!");
-      console.log("   Ahora recibirás notificaciones cuando se generen videos.\n");
+      console.log(
+        "   Ahora recibirás notificaciones cuando se generen videos.\n",
+      );
     }
-
   } catch (error: any) {
     console.error("❌ Error:", error.message);
     console.log("\n💡 Verifica tu conexión a internet y la configuración");
