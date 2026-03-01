@@ -190,6 +190,18 @@ export async function executePipelineFromDB(
             channels: groupChannels.map((ch) => ch.name),
           },
         });
+
+        // 📱 Notificar error de generación para cada canal del grupo
+        for (const channel of groupChannels) {
+          await notifyVideoError(
+            channel.name,
+            channel.language,
+            "Error durante generación",
+            error.message,
+          );
+        }
+
+        errorsCount += groupChannels.length;
         // Continuar con otros grupos
       }
     }
@@ -222,6 +234,16 @@ export async function executePipelineFromDB(
             channel_name: channel.name,
           },
         });
+
+        // 📱 Notificar error de generación del canal
+        await notifyVideoError(
+          channel.name,
+          channel.language,
+          "Error durante generación",
+          error.message,
+        );
+
+        errorsCount++;
         // Continuar con otros canales independientes
       }
     }
