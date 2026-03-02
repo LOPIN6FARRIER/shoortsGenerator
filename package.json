@@ -37,7 +37,7 @@
     "googleapis": "^134.0.0",
     "jsonwebtoken": "^9.0.3",
     "katax-core": "^1.5.3",
-    "katax-service-manager": "^0.3.4",
+    "katax-service-manager": "^0.3.5",
     "node-cron": "^4.2.1",
     "openai": "^4.67.0",
     "pg": "^8.18.0",

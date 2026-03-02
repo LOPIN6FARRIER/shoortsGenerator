@@ -10,6 +10,7 @@ import { Logger } from "./utils.js";
 import {
   katax,
   CallbackTransport,
+  TelegramTransport,
   registerVersionToRedis,
   startHeartbeat,
   registerProjectInRedis,
@@ -149,6 +150,24 @@ async function bootstrapKatax(): Promise<void> {
   });
 
   katax.logger.setAppName(APP_NAME);
+
+  // 📱 Configurar Telegram Transport (para errores críticos → AppAlerts)
+  if (
+    process.env.TELEGRAM_ENABLED === "true" &&
+    process.env.TELEGRAM_BOT_TOKEN &&
+    process.env.TELEGRAM_ALERTS_CHAT_ID
+  ) {
+    const telegramTransport = new TelegramTransport({
+      botToken: process.env.TELEGRAM_BOT_TOKEN,
+      chatId: process.env.TELEGRAM_ALERTS_CHAT_ID, // Grupo AppAlerts
+      levels: ["error", "fatal"], // Solo errores críticos
+      includePersist: true, // También logs marcados con persist=true
+      parseMode: "Markdown",
+      name: "telegram-errors",
+    });
+    katax.logger.addTransport(telegramTransport);
+    Logger.success("✅ Telegram Transport configurado → AppAlerts");
+  }
 }
 
 async function setupRealtimeAndRegistry(
